@@ -751,19 +751,6 @@ export default function App() {
               <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent via-gold-400 to-gold-400/40" />
             </motion.div>
 
-            {/* 5. Hashtag Badge */}
-            {config.hashtag && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                className="mt-1 sm:mt-2"
-              >
-                <span className="inline-block px-4 py-1.5 rounded-full bg-red-950/40 backdrop-blur-md border border-gold-400/50 text-gold-300 text-[11px] sm:text-xs font-display font-semibold tracking-widest uppercase shadow-lg">
-                  {config.hashtag}
-                </span>
-              </motion.div>
-            )}
           </div>
 
           {/* Spacer allowing bottom half of background photo to remain visible and uncluttered */}
@@ -1679,8 +1666,15 @@ export default function App() {
         </motion.section>
 
         {/* FOOTER */}
-        <footer className="py-10 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden">
+        <footer className="py-12 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden">
           <div className="absolute inset-0 bg-pink-50/50 pointer-events-none" />
+          {config.hashtag && (
+            <div className="relative mb-6">
+              <span className="inline-block px-5 py-2 rounded-full bg-gradient-to-r from-royal-red-900 to-royal-red-950 border border-gold-400 text-gold-200 text-xs md:text-sm font-display font-bold tracking-[0.2em] uppercase shadow-md">
+                {config.hashtag}
+              </span>
+            </div>
+          )}
           <div className="relative border border-pink-300 px-6 md:px-10 py-3 bg-white/90 shadow-sm mb-6 rounded-sm">
             <span className="font-sans text-[10px] md:text-xs uppercase tracking-[0.2em] md:tracking-[0.3em] text-pink-800/80 font-bold whitespace-nowrap">
               Create with <span className="text-red-500 animate-pulse inline-block mx-1">❤️</span> by digiinvitations_
