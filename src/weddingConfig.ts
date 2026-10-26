@@ -166,8 +166,8 @@ export const weddingConfig: WeddingConfig = {
     }
   ],
   socialLinks: {
-    facebook: "https://facebook.com",
-    instagram: "https://instagram.com"
+    facebook: "",
+    instagram: "https://www.instagram.com/nishiagrawal__official?cplk=MXJueW51ZzZyMGgzaA=="
   },
   familyDetails: {
     message: "With the divine blessings of Lord Ganesha and our revered ancestors, we cordially invite you and your family to grace the auspicious wedding ceremony of Naman & Nishi and bestow your hearty blessings upon the newlyweds.",

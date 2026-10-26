@@ -1641,25 +1641,16 @@ export default function App() {
               ))}
             </div>
 
-            {/* Social icons */}
-            <div className="flex items-center justify-center space-x-6">
+            {/* Social icon */}
+            <div className="flex items-center justify-center">
               <a
                 href={config.socialLinks.instagram}
                 target="_blank"
                 rel="noreferrer"
-                className="w-10 h-10 rounded-full border border-gold-600/40 flex items-center justify-center text-gold-900 hover:text-gold-900 hover:border-gold-600 transition-colors shadow-md hover:shadow-lg cursor-pointer bg-white"
-                title="Instagram Link"
+                className="w-12 h-12 rounded-full border-2 border-gold-500 bg-gradient-to-br from-pink-500 via-purple-600 to-amber-500 text-white flex items-center justify-center hover:scale-110 transition-transform shadow-xl cursor-pointer"
+                title="Instagram Profile"
               >
-                <Instagram size={18} />
-              </a>
-              <a
-                href={config.socialLinks.facebook}
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full border border-gold-600/40 flex items-center justify-center text-gold-900 hover:text-gold-900 hover:border-gold-600 transition-colors shadow-md hover:shadow-lg cursor-pointer bg-white"
-                title="Facebook Link"
-              >
-                <Facebook size={18} />
+                <Instagram size={22} className="stroke-[2.5]" />
               </a>
             </div>
           </div>
@@ -1669,8 +1660,8 @@ export default function App() {
         <footer className="py-12 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden">
           <div className="absolute inset-0 bg-pink-50/50 pointer-events-none" />
           {config.hashtag && (
-            <div className="relative mb-6">
-              <span className="inline-block px-5 py-2 rounded-full bg-gradient-to-r from-royal-red-900 to-royal-red-950 border border-gold-400 text-gold-200 text-xs md:text-sm font-display font-bold tracking-[0.2em] uppercase shadow-md">
+            <div className="relative mb-8 px-4">
+              <span className="inline-block px-8 py-3 rounded-full bg-gradient-to-r from-royal-red-950 via-red-900 to-royal-red-950 border-2 border-gold-400 text-gold-300 text-sm md:text-base font-display font-black tracking-[0.25em] uppercase shadow-[0_4px_20px_rgba(222,196,127,0.4)] animate-pulse">
                 {config.hashtag}
               </span>
             </div>
