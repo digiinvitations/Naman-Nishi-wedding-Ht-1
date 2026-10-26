@@ -43,6 +43,7 @@ export interface WeddingConfig {
   heroTagline: string;
   gallerySubtitle: string;
   showGallery?: boolean; // Control visibility of photo gallery section
+  showRsvp?: boolean; // Control visibility of RSVP section on website (default false)
   galleryImages: {
     url: string;
     caption: string;
@@ -90,6 +91,7 @@ export const weddingConfig: WeddingConfig = {
   envelopeIconUrl: "/ganesha.png",
   thankYouImageUrl: "",
   showGallery: true,
+  showRsvp: false,
   gallerySubtitle: "Glimpses of Our Journey",
   galleryImages: [
     {

@@ -170,6 +170,7 @@ export const EnvelopeCover: React.FC<EnvelopeCoverProps> = ({
         <AnimatePresence>
           {!isOpening && (
             <motion.span
+              key="tap-to-open-hint"
               exit={{ opacity: 0 }}
               className="font-sans text-[10px] uppercase text-red-900 tracking-[0.3em] mt-8 font-bold bg-white/80 backdrop-blur-sm px-6 py-2 rounded-full border border-pink-200 shadow-sm"
             >

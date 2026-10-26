@@ -97,6 +97,7 @@ export const Preloader: React.FC<PreloaderProps> = ({
     <AnimatePresence>
       {!isFading && (
         <motion.div
+          key="preloader-overlay"
           exit={{ opacity: 0, scale: 1.02 }}
           transition={{ duration: 0.6, ease: "easeInOut" }}
           className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#fdf5f5]"

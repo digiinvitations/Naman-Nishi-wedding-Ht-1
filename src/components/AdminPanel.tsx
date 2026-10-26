@@ -770,10 +770,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
   const totalDeclined = rsvps.filter((r) => !r.attend).length;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div 
-          key="admin-panel-root"
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            key="admin-panel-root"
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden"
         >
@@ -792,48 +793,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
             className="relative w-full max-w-4xl bg-white border border-pink-300 rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-pink-300/20 mb-4 shrink-0">
-              <div>
-                <h3 className="font-display text-xl text-pink-900 flex items-center gap-2">
-                  <Settings size={22} className="text-pink-700" /> Host Dashboard
-                </h3>
-                <p className="text-[10px] text-pink-800/60 uppercase tracking-widest mt-0.5">
-                  Manage Content & RSVPs
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {isAuthenticated && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".json,application/json"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-pink-900 bg-pink-100 hover:bg-pink-200 border border-pink-300/60 text-xs uppercase tracking-wider font-bold rounded-xl px-3 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-                      title="Import data backup JSON"
-                    >
-                      <Upload size={13} className="text-pink-700" />
-                      <span className="hidden sm:inline">Import Data</span>
-                      <span className="sm:hidden">Import</span>
-                    </button>
-                    <button
-                      onClick={handleExportData}
-                      className="text-white bg-gold-gradient hover:opacity-95 text-xs uppercase tracking-wider font-bold rounded-xl px-3 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-                      title="Export full data backup JSON"
-                    >
-                      <Download size={13} />
-                      <span className="hidden sm:inline">Export Data</span>
-                      <span className="sm:hidden">Export</span>
-                    </button>
-                  </>
-                )}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 border-b border-pink-300/20 mb-3 gap-2.5 shrink-0">
+              <div className="flex items-center justify-between w-full sm:w-auto">
+                <div>
+                  <h3 className="font-display text-lg sm:text-xl text-pink-900 flex items-center gap-2 font-bold">
+                    <Settings size={20} className="text-pink-700" /> Host Dashboard
+                  </h3>
+                  <p className="text-[10px] text-pink-800/70 uppercase tracking-widest mt-0.5 font-semibold">
+                    Manage Content, RSVPs & Backups
+                  </p>
+                </div>
                 <button
                   onClick={onClose}
-                  className="text-pink-800/60 hover:text-pink-900 text-xs uppercase tracking-wider font-semibold border border-pink-300/20 rounded-full px-3.5 py-1.5 cursor-pointer transition-colors"
+                  className="sm:hidden text-pink-800/80 hover:text-pink-900 text-xs font-bold border border-pink-300/40 rounded-full px-3 py-1 cursor-pointer bg-pink-50"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Header Action Buttons (Import, Export & Close) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500/50 text-xs font-bold rounded-xl px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow transition-all"
+                  title="Import data backup from a JSON file"
+                >
+                  <Upload size={14} />
+                  <span>Import Data</span>
+                </button>
+                <button
+                  onClick={handleExportData}
+                  className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white border border-amber-500/50 text-xs font-bold rounded-xl px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow transition-all"
+                  title="Export full data backup to a JSON file"
+                >
+                  <Download size={14} />
+                  <span>Export Data</span>
+                </button>
+                <button
+                  onClick={onClose}
+                  className="hidden sm:inline-flex text-pink-800/70 hover:text-pink-900 text-xs font-bold border border-pink-300/30 rounded-full px-3.5 py-1.5 cursor-pointer hover:bg-pink-50 transition-colors"
                 >
                   Close
                 </button>
@@ -847,74 +852,142 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                 onSubmit={handleLogin}
                 className="flex flex-col items-center justify-center py-10 space-y-4 my-auto"
               >
-                <div className="w-12 h-12 rounded-full bg-gold-400/10 flex items-center justify-center text-pink-700 mb-2">
-                  <Key size={24} />
+                <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-300/40 flex items-center justify-center text-amber-700 mb-1 shadow-sm">
+                  <Key size={26} />
                 </div>
-                <h4 className="font-display text-lg text-pink-900">Enter Host Passcode</h4>
-                <p className="text-xs text-pink-800/60 max-w-xs text-center">
-                  Please enter the secret passcode to access the website management tools.
+                <h4 className="font-display text-xl text-pink-900 font-bold">Host Passcode Verification</h4>
+                <p className="text-xs text-pink-800/70 max-w-sm text-center leading-relaxed">
+                  Please enter the 4-digit host passcode to access wedding editing tools and guest RSVP management.
                 </p>
                 <div className="w-full max-w-xs relative">
                   <input
                     type="password"
-                    placeholder="Enter Passcode"
+                    placeholder="Enter Passcode (9456)"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                     disabled={isLocked}
-                    className={`w-full bg-pink-50/50 text-gray-900 border border-pink-300/30 rounded-xl px-4 py-3 text-center focus:outline-none focus:border-pink-300 text-sm tracking-widest placeholder:text-pink-700/30 font-semibold ${isLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`w-full bg-pink-50/70 text-gray-900 border-2 border-pink-300/50 rounded-xl px-4 py-3 text-center focus:outline-none focus:border-amber-500 text-base tracking-widest placeholder:text-pink-700/40 font-bold shadow-inner ${isLocked ? "opacity-50 cursor-not-allowed" : ""}`}
                     autoFocus
                   />
                 </div>
-                {error && <p className="text-pink-300 text-xs font-semibold px-2">{error}</p>}
-                <button
-                  type="submit"
-                  disabled={isLocked}
-                  className={`bg-gold-gradient text-white font-bold uppercase text-xs tracking-wider py-2.5 px-6 rounded-xl ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                >
-                  Unlock Dashboard
-                </button>
-              </motion.form>
-            ) : (
-              <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
-                {/* Sidebar Tabs */}
-                <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:w-48 shrink-0 pb-4 md:pb-0 md:pr-4 border-b md:border-b-0 md:border-r border-pink-300/20 mb-4 md:mb-0 scrollbar-none">
+                {error && <p className="text-rose-600 text-xs font-bold px-2">{error}</p>}
+                
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
                   <button
-                    onClick={() => setActiveTab("rsvps")}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "rsvps" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                    type="submit"
+                    disabled={isLocked}
+                    className={`bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs uppercase tracking-wider py-2.5 px-6 rounded-xl shadow-md transition-all ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                   >
-                    <Users size={16} /> RSVPs
+                    Unlock Dashboard
                   </button>
                   <button
-                    onClick={() => setActiveTab("couple")}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "couple" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 py-2.5 px-4 rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
-                    <Edit3 size={16} /> Couple Info
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("events")}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "events" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
-                  >
-                    <Calendar size={16} /> Events Setup
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("media")}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "media" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
-                  >
-                    <Video size={16} /> Teaser & Media
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("backup")}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "backup" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
-                  >
-                    <HardDrive size={16} /> Backup & Restore
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("database")}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "database" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
-                  >
-                    <Database size={16} /> Database Sync
+                    <Upload size={13} />
+                    <span>Restore From Backup JSON</span>
                   </button>
                 </div>
+              </motion.form>
+            ) : (
+              <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+                {/* Dedicated Persistent Quick Action Bar for Backup & Restore */}
+                <div className="bg-gradient-to-r from-amber-50/90 via-pink-50/80 to-emerald-50/90 border border-amber-200/70 rounded-2xl p-2.5 sm:p-3 mb-3 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0">
+                      <HardDrive size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-900">
+                          Data Backup & Restore Center
+                        </span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                          Active
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-gray-600 hidden sm:block">
+                        Download full offline backup (JSON) or restore previous wedding settings & RSVPs anytime.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm hover:shadow transition-all cursor-pointer"
+                      title="Import wedding configuration or RSVPs from a JSON backup file"
+                    >
+                      <Upload size={13} />
+                      <span>Import Data</span>
+                    </button>
+                    <button
+                      onClick={handleExportData}
+                      className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm hover:shadow transition-all cursor-pointer"
+                      title="Export all wedding settings, event details, photos, and RSVPs as JSON"
+                    >
+                      <Download size={13} />
+                      <span>Export Data</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("backup")}
+                      className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${
+                        activeTab === "backup" 
+                          ? "bg-amber-100 border-amber-300 text-amber-900" 
+                          : "bg-white/80 border-gray-200 text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      Details →
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
+                  {/* Sidebar Tabs */}
+                  <div className="flex md:flex-col gap-1.5 sm:gap-2 overflow-x-auto md:overflow-y-auto md:w-52 shrink-0 pb-3 md:pb-0 md:pr-3 border-b md:border-b-0 md:border-r border-pink-300/20 mb-3 md:mb-0 scrollbar-none">
+                    <button
+                      onClick={() => setActiveTab("backup")}
+                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all shrink-0 ${activeTab === "backup" ? "bg-amber-500/25 text-amber-950 border border-amber-300 shadow-xs" : "text-amber-900/80 hover:bg-amber-50"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <HardDrive size={16} className="text-amber-700" />
+                        <span>Backup & Restore</span>
+                      </div>
+                      <span className="text-[9px] bg-amber-200 text-amber-950 font-extrabold px-1.5 py-0.5 rounded-md">
+                        Import/Export
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("rsvps")}
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-colors shrink-0 ${activeTab === "rsvps" ? "bg-gold-500/20 text-pink-900 font-bold" : "text-pink-800/60 hover:bg-gold-500/10"}`}
+                    >
+                      <Users size={16} /> RSVPs ({rsvps.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("couple")}
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-colors shrink-0 ${activeTab === "couple" ? "bg-gold-500/20 text-pink-900 font-bold" : "text-pink-800/60 hover:bg-gold-500/10"}`}
+                    >
+                      <Edit3 size={16} /> Couple Info
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("events")}
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-colors shrink-0 ${activeTab === "events" ? "bg-gold-500/20 text-pink-900 font-bold" : "text-pink-800/60 hover:bg-gold-500/10"}`}
+                    >
+                      <Calendar size={16} /> Events Setup
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("media")}
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-colors shrink-0 ${activeTab === "media" ? "bg-gold-500/20 text-pink-900 font-bold" : "text-pink-800/60 hover:bg-gold-500/10"}`}
+                    >
+                      <Video size={16} /> Teaser & Media
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("database")}
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-colors shrink-0 ${activeTab === "database" ? "bg-gold-500/20 text-pink-900 font-bold" : "text-pink-800/60 hover:bg-gold-500/10"}`}
+                    >
+                      <Database size={16} /> Database Sync
+                    </button>
+                  </div>
 
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto md:pl-4 scrollbar-thin pb-16 md:pb-0">
@@ -935,13 +1008,83 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center mb-3 shrink-0">
-                        <span className="text-xs text-pink-800/60 font-semibold">Guest Entries ({rsvps.length})</span>
-                        <div className="flex gap-2">
-                          <button onClick={exportToCSV} disabled={rsvps.length === 0} className="text-[11px] bg-emerald-700/80 hover:bg-emerald-600 disabled:opacity-40 text-gray-900 font-bold uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer">
-                            <FileSpreadsheet size={13} /> Export
+                      {/* RSVP Website Visibility Status & Toggle */}
+                      <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5 transition-colors ${
+                        editConfig.showRsvp === true 
+                          ? "bg-emerald-50/80 border-emerald-200" 
+                          : "bg-rose-50/80 border-rose-200"
+                      }`}>
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                            {editConfig.showRsvp === true ? (
+                              <>
+                                <Eye size={14} className="text-emerald-700 shrink-0" />
+                                <span className="text-emerald-950">RSVP Form is currently Visible on Website</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff size={14} className="text-rose-700 shrink-0" />
+                                <span className="text-rose-950">RSVP Form is currently Hidden from Website</span>
+                              </>
+                            )}
+                          </span>
+                          <span className="text-[11px] text-gray-600 block">
+                            {editConfig.showRsvp === true 
+                              ? "Guests can see the RSVP form on the wedding website and submit their responses." 
+                              : "The RSVP section has been removed from the public website for guests as requested."}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextVal = editConfig.showRsvp === true ? false : true;
+                            const updated = { ...editConfig, showRsvp: nextVal };
+                            setEditConfig(updated);
+                            onConfigChange(updated);
+                            setToastMessage(nextVal ? "RSVP section is now visible on website" : "RSVP section removed from website");
+                            setShowToast(true);
+                            setTimeout(() => setShowToast(false), 3000);
+                          }}
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer shrink-0 transition-colors ${
+                            editConfig.showRsvp === true
+                              ? "bg-rose-600 hover:bg-rose-700 text-white"
+                              : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          }`}
+                        >
+                          {editConfig.showRsvp === true ? "Hide RSVP from Website" : "Show RSVP on Website"}
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap justify-between items-center mb-3 gap-2 shrink-0">
+                        <span className="text-xs text-pink-800/80 font-bold">Guest Entries ({rsvps.length})</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            title="Import wedding data or RSVPs from JSON"
+                          >
+                            <Upload size={13} /> Import Data
                           </button>
-                          <button onClick={handleClearAllRsvps} disabled={rsvps.length === 0} className="text-[11px] bg-rose-800/80 hover:bg-rose-700 disabled:opacity-40 text-gray-900 font-bold uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer">
+                          <button
+                            onClick={handleExportData}
+                            className="text-[11px] bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            title="Export full backup JSON"
+                          >
+                            <Download size={13} /> Export Backup
+                          </button>
+                          <button
+                            onClick={exportToCSV}
+                            disabled={rsvps.length === 0}
+                            className="text-[11px] bg-pink-100 hover:bg-pink-200 border border-pink-300/60 disabled:opacity-40 text-pink-900 font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                            title="Download CSV spreadsheet"
+                          >
+                            <FileSpreadsheet size={13} /> CSV
+                          </button>
+                          <button
+                            onClick={handleClearAllRsvps}
+                            disabled={rsvps.length === 0}
+                            className="text-[11px] bg-rose-50 hover:bg-rose-100 border border-rose-300/60 text-rose-700 disabled:opacity-40 font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                          >
                             <Trash2 size={13} /> Reset
                           </button>
                         </div>
@@ -1164,9 +1307,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                                     { name: "🪈 Soulful Divine Flute", desc: "Romantic, Soft & Blissful", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
                                     { name: "🪕 Sacred Sitar Harmony", desc: "Elegant & Traditional", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
                                     { name: "🎸 Acoustic Romantic Love", desc: "Modern Sweet Instrumental", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" }
-                                  ].map((track) => (
+                                  ].map((track, trackIdx) => (
                                     <button
-                                      key={track.url}
+                                      key={`preset-track-${trackIdx}-${track.name}`}
                                       type="button"
                                       onClick={() => {
                                         setEditConfig(p => ({ ...p, musicUrl: track.url }));
@@ -1438,6 +1581,202 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                     </motion.div>
                   )}
 
+                  {activeTab === "backup" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                      {/* Top Header Card */}
+                      <div className="bg-gradient-to-br from-amber-50 to-pink-50 p-5 rounded-2xl border border-amber-200/80 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pink-200/60 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0">
+                              <HardDrive size={22} />
+                            </div>
+                            <div>
+                              <h4 className="font-display text-pink-950 text-lg font-bold">
+                                Data Backup & Restore Center
+                              </h4>
+                              <p className="text-xs text-gray-600">
+                                Download a full snapshot of your wedding data or restore from a JSON backup file
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1">
+                              <CheckCircle2 size={12} /> Live Sync Active
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Current Data Overview */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                          <div className="bg-white/80 border border-pink-200 p-2.5 rounded-xl text-center">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Couple Info</span>
+                            <span className="text-xs font-bold text-pink-950 truncate block mt-0.5">
+                              {editConfig.groom?.name?.split(" ")[0]} & {editConfig.bride?.name?.split(" ")[0]}
+                            </span>
+                          </div>
+                          <div className="bg-white/80 border border-pink-200 p-2.5 rounded-xl text-center">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Ceremonies</span>
+                            <span className="text-base font-bold text-amber-900 block mt-0.5">
+                              {editConfig.events?.length || 0} Events
+                            </span>
+                          </div>
+                          <div className="bg-white/80 border border-pink-200 p-2.5 rounded-xl text-center">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Gallery Photos</span>
+                            <span className="text-base font-bold text-amber-900 block mt-0.5">
+                              {editConfig.galleryImages?.length || 0} Photos
+                            </span>
+                          </div>
+                          <div className="bg-white/80 border border-pink-200 p-2.5 rounded-xl text-center">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Total RSVPs</span>
+                            <span className="text-base font-bold text-pink-900 block mt-0.5">
+                              {rsvps.length} Entries
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Main Two Action Cards: Export and Import */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        
+                        {/* 1. EXPORT DATA CARD */}
+                        <div className="bg-white p-5 rounded-2xl border-2 border-amber-300/80 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow">
+                          <div className="space-y-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                              <Download size={20} />
+                            </div>
+                            <div>
+                              <h5 className="font-display text-base font-bold text-gray-900">
+                                1. Export Data Backup
+                              </h5>
+                              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                                Download a complete offline backup file (JSON format) containing all your wedding customizations:
+                              </p>
+                            </div>
+                            <ul className="text-[11px] text-gray-600 space-y-1.5 pl-1">
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>Couple names, bios, hero tagline & family details</span>
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>All wedding ceremony dates, times, addresses & map links</span>
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>Full gallery photos, background audio & video links</span>
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>All guest RSVPs ({rsvps.length} registered responses)</span>
+                              </li>
+                            </ul>
+                          </div>
+
+                          <div className="space-y-2 pt-2 border-t border-gray-100">
+                            <button
+                              onClick={handleExportData}
+                              className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs uppercase tracking-wider py-3 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            >
+                              <Download size={16} />
+                              <span>Download Full Backup (.JSON)</span>
+                            </button>
+                            <button
+                              onClick={exportToCSV}
+                              disabled={rsvps.length === 0}
+                              className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs uppercase tracking-wider py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 transition-colors"
+                            >
+                              <FileSpreadsheet size={15} />
+                              <span>Export RSVPs Only (.CSV)</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 2. IMPORT DATA CARD */}
+                        <div className="bg-white p-5 rounded-2xl border-2 border-emerald-300/80 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow">
+                          <div className="space-y-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                              <Upload size={20} />
+                            </div>
+                            <div>
+                              <h5 className="font-display text-base font-bold text-gray-900">
+                                2. Import Data / Restore
+                              </h5>
+                              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                                Upload a previously downloaded JSON backup file to restore your wedding website immediately:
+                              </p>
+                            </div>
+                            <ul className="text-[11px] text-gray-600 space-y-1.5 pl-1">
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>Preview backup contents safely before applying</span>
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>Choose to restore settings, RSVPs, or both</span>
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>Choose to merge or replace existing RSVP records</span>
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check size={13} className="text-emerald-600 shrink-0" />
+                                <span>Instantly saves to active database (Firebase/Supabase)</span>
+                              </li>
+                            </ul>
+                          </div>
+
+                          <div className="space-y-2 pt-2 border-t border-gray-100">
+                            <button
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider py-3 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            >
+                              <Upload size={16} />
+                              <span>Select Backup File (.JSON)</span>
+                            </button>
+                            <p className="text-[10px] text-center text-gray-400">
+                              Supports all valid wedding backup .json files
+                            </p>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Quick Copy Backup to Clipboard */}
+                      <div className="bg-pink-50/40 p-4 rounded-2xl border border-pink-300/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-gray-800 block">Copy Raw JSON to Clipboard</span>
+                          <span className="text-[11px] text-gray-500 block">
+                            Directly copy raw backup text data to paste into an email or text file
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try {
+                              const backupData = {
+                                app: "Royal Hindu Wedding Invitation",
+                                backupVersion: "1.0",
+                                exportedAt: new Date().toISOString(),
+                                config: editConfig,
+                                rsvps: rsvps
+                              };
+                              navigator.clipboard.writeText(JSON.stringify(backupData, null, 2));
+                              setToastMessage("Backup JSON copied to clipboard!");
+                              setShowToast(true);
+                              setTimeout(() => setShowToast(false), 3000);
+                            } catch (e: any) {
+                              alert("Failed to copy: " + e.message);
+                            }
+                          }}
+                          className="bg-white hover:bg-pink-50 text-pink-900 border border-pink-300 text-xs font-bold py-2 px-3.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shrink-0 transition-colors"
+                        >
+                          <Copy size={14} />
+                          <span>Copy Backup JSON</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {activeTab === "database" && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                       <div className="bg-pink-50/30 p-5 rounded-2xl border border-pink-300/10 space-y-4">
@@ -1691,10 +2030,12 @@ CREATE TABLE public.fs_files (
                   )}
                 </div>
               </div>
-            )}
-          </motion.div>
+            </div>
+          )}
         </motion.div>
-      )}
+      </motion.div>
+    )}
+    </AnimatePresence>
 
       {/* Import Preview & Confirmation Modal */}
       <AnimatePresence>
@@ -1898,7 +2239,7 @@ CREATE TABLE public.fs_files (
           </motion.div>
         )}
       </AnimatePresence>
-    </AnimatePresence>
+    </>
   );
 };
 

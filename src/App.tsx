@@ -121,6 +121,7 @@ export default function App() {
                 ...defaultWeddingConfig,
                 ...configData,
                 showGallery: configData.showGallery !== undefined ? configData.showGallery : defaultWeddingConfig.showGallery,
+                showRsvp: configData.showRsvp === true ? true : false,
                 events: configData.events || defaultWeddingConfig.events,
                 galleryImages: configData.galleryImages || defaultWeddingConfig.galleryImages,
                 groom: { ...defaultWeddingConfig.groom, ...(configData.groom || {}) },
@@ -142,6 +143,7 @@ export default function App() {
             ...defaultWeddingConfig,
             ...data,
             showGallery: data.showGallery !== undefined ? data.showGallery : defaultWeddingConfig.showGallery,
+            showRsvp: data.showRsvp === true ? true : false,
             events: data.events || defaultWeddingConfig.events,
             galleryImages: data.galleryImages || defaultWeddingConfig.galleryImages,
             groom: { ...defaultWeddingConfig.groom, ...(data.groom || {}) },
@@ -1338,10 +1340,10 @@ export default function App() {
                 )}
               </div>
 
-              {/* Vanish transition photo gallery */}
-              <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-gold-500/20 group bg-neutral-950 flex items-center justify-center min-h-[300px] transition-all duration-500">
+              {/* Smooth crossfade photo gallery with fixed container height to prevent splashing/layout shift */}
+              <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-gold-500/20 group bg-neutral-950 flex items-center justify-center h-[450px] md:h-[550px]">
                  {config.galleryImages.length > 0 && (
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="popLayout">
                        <motion.div
                           key={`gallery-${galleryKeyCount}`}
                           initial={{ opacity: 0 }}
@@ -1419,186 +1421,189 @@ export default function App() {
           </>
         )}
 
-        <SectionSeparator />
+        {/* 11. RSVP FORM SECTION (Hidden from website by default, toggleable in Host Dashboard) */}
+        {config.showRsvp === true && (
+          <>
+            <SectionSeparator />
 
-        {/* 11. RSVP FORM SECTION */}
-        <motion.section 
-          id="rsvp" 
-          initial={{ opacity: 0, y: 30 }} 
-          whileInView={{ opacity: 1, y: 0 }} 
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-          className="py-16 px-4 max-w-lg mx-auto relative z-10"
-        >
-          <OrnateFrame borderColor="border-gold-600/40 bg-white/60">
-            <form onSubmit={handleRSVPSubmit} className="space-y-6 p-2 text-center">
-              <div>
-                <Heart size={24} className="text-gold-600 fill-gold-600 mx-auto animate-pulse mb-3" />
-                <h2 className="font-display text-2xl md:text-3xl text-red-700 uppercase font-bold flex justify-center items-center gap-3">
-                  <Sparkles size={20} className="text-gold-500" />
-                  Kindly RSVP
-                  <Sparkles size={20} className="text-gold-500" />
-                </h2>
-                <p className="font-sans text-[10px] text-gray-600 uppercase tracking-[0.2em] mt-1 font-semibold flex justify-center items-center gap-2">
-                  <Flower2 size={10} className="text-gold-500" />
-                  Please respond by December 1, 2026
-                  <Flower2 size={10} className="text-gold-500" />
-                </p>
-                <div className="w-12 h-[1px] bg-gold-600/40 mx-auto mt-4" />
-              </div>
-
-              {/* RSVP Fields */}
-              <div className="space-y-4 text-left">
-                
-                {/* Full Name */}
-                <div>
-                  <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold">
-                    Your Full Name
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
-                      <User size={16} />
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g., Harish Sharma"
-                      value={rsvpName}
-                      onChange={(e) => setRsvpName(e.target.value)}
-                      className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium shadow-sm"
-                    />
+            <motion.section 
+              id="rsvp" 
+              initial={{ opacity: 0, y: 30 }} 
+              whileInView={{ opacity: 1, y: 0 }} 
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6 }}
+              className="py-16 px-4 max-w-lg mx-auto relative z-10"
+            >
+              <OrnateFrame borderColor="border-gold-600/40 bg-white/60">
+                <form onSubmit={handleRSVPSubmit} className="space-y-6 p-2 text-center">
+                  <div>
+                    <Heart size={24} className="text-gold-600 fill-gold-600 mx-auto animate-pulse mb-3" />
+                    <h2 className="font-display text-2xl md:text-3xl text-red-700 uppercase font-bold flex justify-center items-center gap-3">
+                      <Sparkles size={20} className="text-gold-500" />
+                      Kindly RSVP
+                      <Sparkles size={20} className="text-gold-500" />
+                    </h2>
+                    <p className="font-sans text-[10px] text-gray-600 uppercase tracking-[0.2em] mt-1 font-semibold flex justify-center items-center gap-2">
+                      <Flower2 size={10} className="text-gold-500" />
+                      Please respond by December 1, 2026
+                      <Flower2 size={10} className="text-gold-500" />
+                    </p>
+                    <div className="w-12 h-[1px] bg-gold-600/40 mx-auto mt-4" />
                   </div>
-                </div>
 
-                {/* Phone Number */}
-                <div>
-                  <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold">
-                    Phone Number
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Phone size={16} />
-                    </span>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="e.g., +91 98765 43210"
-                      value={rsvpPhone}
-                      onChange={(e) => setRsvpPhone(e.target.value)}
-                      className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium shadow-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Will you attend? */}
-                <div>
-                  <label className="text-xs uppercase tracking-widest text-gray-900 block mb-2 font-semibold">
-                    Will You Attend?
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRsvpAttend(true);
-                        confetti({
-                          particleCount: 100,
-                          spread: 70,
-                          origin: { y: 0.8 },
-                          colors: ['#dec47f', '#962325', '#f8d98d']
-                        });
-                      }}
-                      className={`py-3 px-4 rounded-xl font-bold uppercase text-xs tracking-wider border transition-all cursor-pointer ${
-                        rsvpAttend === true
-                          ? "bg-gold-gradient text-white border-gold-600 shadow-md"
-                          : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gold-600/40"
-                      }`}
-                    >
-                      Yes, Joyfully!
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRsvpAttend(false)}
-                      className={`py-3 px-4 rounded-xl font-bold uppercase text-xs tracking-wider border transition-all cursor-pointer ${
-                        rsvpAttend === false
-                          ? "bg-gold-gradient text-white border-gold-600 shadow-md"
-                          : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gold-600/40"
-                      }`}
-                    >
-                      Regretfully, No
-                    </button>
-                  </div>
-                </div>
-
-                {/* Guest Selector (Conditional) */}
-                <AnimatePresence>
-                  {rsvpAttend === true && (
-                    <motion.div
-                      key="guest-selector"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold mt-4">
-                        Number of Guests
+                  {/* RSVP Fields */}
+                  <div className="space-y-4 text-left">
+                    
+                    {/* Full Name */}
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold">
+                        Your Full Name
                       </label>
                       <div className="relative">
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
-                          <Users size={16} />
+                          <User size={16} />
                         </span>
-                        <select
-                          value={rsvpGuests}
-                          onChange={(e) => setRsvpGuests(Number(e.target.value))}
-                          className="w-full bg-white text-gray-900 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium appearance-none shadow-sm"
-                        >
-                          <option value="1">1 Guest</option>
-                          <option value="2">2 Guests</option>
-                          <option value="3">3 Guests</option>
-                          <option value="4">4 Guests</option>
-                          <option value="5">5+ Guests</option>
-                        </select>
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                          ▼
-                        </span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g., Harish Sharma"
+                          value={rsvpName}
+                          onChange={(e) => setRsvpName(e.target.value)}
+                          className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium shadow-sm"
+                        />
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </div>
 
-                {/* Warm wishes / Messages */}
-                <div>
-                  <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold mt-4">
-                    Blessing Message
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-3.5 text-gray-400">
-                      <MessageSquare size={16} />
-                    </span>
-                    <textarea
-                      rows={3}
-                      placeholder="Send your blessings, warm wishes, or dietary notes..."
-                      value={rsvpMessage}
-                      onChange={(e) => setRsvpMessage(e.target.value)}
-                      className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium resize-none shadow-sm"
-                    />
+                    {/* Phone Number */}
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                          <Phone size={16} />
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="e.g., +91 98765 43210"
+                          value={rsvpPhone}
+                          onChange={(e) => setRsvpPhone(e.target.value)}
+                          className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium shadow-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Will you attend? */}
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-gray-900 block mb-2 font-semibold">
+                        Will You Attend?
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRsvpAttend(true);
+                            confetti({
+                              particleCount: 100,
+                              spread: 70,
+                              origin: { y: 0.8 },
+                              colors: ['#dec47f', '#962325', '#f8d98d']
+                            });
+                          }}
+                          className={`py-3 px-4 rounded-xl font-bold uppercase text-xs tracking-wider border transition-all cursor-pointer ${
+                            rsvpAttend === true
+                              ? "bg-gold-gradient text-white border-gold-600 shadow-md"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gold-600/40"
+                          }`}
+                        >
+                          Yes, Joyfully!
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRsvpAttend(false)}
+                          className={`py-3 px-4 rounded-xl font-bold uppercase text-xs tracking-wider border transition-all cursor-pointer ${
+                            rsvpAttend === false
+                              ? "bg-gold-gradient text-white border-gold-600 shadow-md"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gold-600/40"
+                          }`}
+                        >
+                          Regretfully, No
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Guest Selector (Conditional) */}
+                    <AnimatePresence>
+                      {rsvpAttend === true && (
+                        <motion.div
+                          key="guest-selector"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold mt-4">
+                            Number of Guests
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                              <Users size={16} />
+                            </span>
+                            <select
+                              value={rsvpGuests}
+                              onChange={(e) => setRsvpGuests(Number(e.target.value))}
+                              className="w-full bg-white text-gray-900 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium appearance-none shadow-sm"
+                            >
+                              <option value="1">1 Guest</option>
+                              <option value="2">2 Guests</option>
+                              <option value="3">3 Guests</option>
+                              <option value="4">4 Guests</option>
+                              <option value="5">5+ Guests</option>
+                            </select>
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                              ▼
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Warm wishes / Messages */}
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-gray-900 block mb-1.5 font-semibold mt-4">
+                        Blessing Message
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-3.5 text-gray-400">
+                          <MessageSquare size={16} />
+                        </span>
+                        <textarea
+                          rows={3}
+                          placeholder="Send your blessings, warm wishes, or dietary notes..."
+                          value={rsvpMessage}
+                          onChange={(e) => setRsvpMessage(e.target.value)}
+                          className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gold-500/30 focus:border-gold-600 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gold-600 transition-colors font-medium resize-none shadow-sm"
+                        />
+                      </div>
+                    </div>
+
                   </div>
-                </div>
 
-              </div>
+                  {/* Submit trigger */}
+                  <button
+                    type="submit"
+                    className="w-full bg-gold-gradient text-white font-bold uppercase text-xs tracking-wider py-4 px-6 rounded-xl shadow-lg hover:shadow-[0_0_20px_rgba(222,196,127,0.6)] transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer mt-2"
+                  >
+                    <Send size={15} />
+                    <span>Submit RSVP</span>
+                  </button>
 
-              {/* Submit trigger */}
-              <button
-                type="submit"
-                className="w-full bg-gold-gradient text-white font-bold uppercase text-xs tracking-wider py-4 px-6 rounded-xl shadow-lg hover:shadow-[0_0_20px_rgba(222,196,127,0.6)] transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer mt-2"
-              >
-                <Send size={15} />
-                <span>Submit RSVP</span>
-              </button>
-
-
-            </form>
-          </OrnateFrame>
-        </motion.section>
+                </form>
+              </OrnateFrame>
+            </motion.section>
+          </>
+        )}
 
         <SectionSeparator />
 
@@ -1682,14 +1687,15 @@ export default function App() {
             </span>
           </div>
           
+          {/* Discreet Host Admin Portal Link */}
           {isOpened && (
             <button
               onClick={() => setShowAdmin(true)}
-              className="relative z-10 text-pink-400/40 hover:text-pink-600 transition-all duration-300 opacity-60 hover:opacity-100 flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold"
-              title="Open Host Admin Panel"
+              className="mt-6 inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-gray-400 hover:text-pink-800 text-[11px] font-sans tracking-wide transition-colors cursor-pointer bg-transparent hover:bg-pink-50/50"
+              title="Host Admin"
             >
-              <Settings size={12} className="animate-[spin_10s_linear_infinite]" />
-              <span>Admin</span>
+              <Settings size={12} className="opacity-60" />
+              <span>Host Admin Portal</span>
             </button>
           )}
         </footer>
@@ -1697,7 +1703,8 @@ export default function App() {
       )}
       </div>
 
-      {/* 13. FLOATING BUTTONS */}
+
+
       {/* Music Floating Toggle (Bottom Left) */}
       {isOpened && (
         <div className="fixed bottom-6 left-6 z-40 flex items-center gap-3 group">

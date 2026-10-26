@@ -725,8 +725,8 @@ export const EditInvitationModal: React.FC<EditInvitationModalProps> = ({
                           }}
                         >
                           <option value="" disabled>+ Quick Add Ceremony...</option>
-                          {COMMON_CEREMONIES.map((cName) => (
-                            <option key={cName} value={cName}>
+                          {COMMON_CEREMONIES.map((cName, cIdx) => (
+                            <option key={`common-ceremony-${cName}-${cIdx}`} value={cName}>
                               + {cName}
                             </option>
                           ))}
@@ -738,7 +738,7 @@ export const EditInvitationModal: React.FC<EditInvitationModalProps> = ({
                     <div className="space-y-4">
                       {ceremonies.map((ceremony, index) => (
                         <div
-                          key={ceremony.id}
+                          key={`ceremony-item-${ceremony.id || index}-${index}`}
                           className="bg-royal-red-950/40 border border-gold-500/25 p-3.5 md:p-4 rounded-xl relative space-y-3"
                         >
                           <div className="flex items-center justify-between">
@@ -976,9 +976,9 @@ export const EditInvitationModal: React.FC<EditInvitationModalProps> = ({
                         Tap chips to insert common requests into your note:
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {HELPER_CHIPS.map((chip) => (
+                        {HELPER_CHIPS.map((chip, chipIdx) => (
                           <button
-                            key={chip.label}
+                            key={`helper-chip-${chip.label}-${chipIdx}`}
                             type="button"
                             onClick={() => handleInsertChip(chip.snippet)}
                             className="text-xs bg-gold-950/70 hover:bg-gold-900 border border-gold-500/40 text-gold-200 hover:text-white px-2.5 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-sm"

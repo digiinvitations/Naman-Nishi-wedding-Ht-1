@@ -42,7 +42,7 @@ export function FallingFlowers({ active }: { active: boolean }) {
     <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
       {flowers.map((f, i) => (
         <div
-          key={f.id}
+          key={`flower-${f.id}-${i}`}
           className={`absolute top-[-50px] animate-flower-fall drop-shadow-sm ${
             i % 3 === 0 ? 'text-pink-300' : i % 3 === 1 ? 'text-pink-400' : 'text-rose-300'
           }`}
