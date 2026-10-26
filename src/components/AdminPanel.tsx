@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, Check, X, FileSpreadsheet, Trash2, Key, ChevronDown, ChevronUp, Image as ImageIcon, Calendar, Edit3, Settings, Video, Database, Copy, AlertCircle, CheckCircle2, Eye, EyeOff, Upload } from "lucide-react";
-import { WeddingConfig, WeddingEvent } from "../weddingConfig";
+import { Users, Check, X, FileSpreadsheet, Trash2, Key, ChevronDown, ChevronUp, Image as ImageIcon, Calendar, Edit3, Settings, Video, Database, Copy, AlertCircle, CheckCircle2, Eye, EyeOff, Upload, Download, FileText, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Layers, HardDrive } from "lucide-react";
+import { WeddingConfig, WeddingEvent, weddingConfig as defaultWeddingConfig } from "../weddingConfig";
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, setDoc, addDoc, writeBatch } from "firebase/firestore";
 import { uploadToFsdb } from "../lib/fsdb";
 import { isSupabaseEnabled, supabase, checkSupabaseTables } from "../lib/supabase";
 import { FirestoreImage } from "./FirestoreImage";
@@ -33,13 +33,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
   const [isLocked, setIsLocked] = useState(false);
   const [rsvps, setRsvps] = useState<RSVPRecord[]>([]);
   
-  const [activeTab, setActiveTab] = useState<"rsvps" | "couple" | "events" | "media" | "database">("rsvps");
+  const [activeTab, setActiveTab] = useState<"rsvps" | "couple" | "events" | "media" | "backup" | "database">("rsvps");
 
   // Local state for editing to avoid constant re-renders during typing
   const [editConfig, setEditConfig] = useState<WeddingConfig>(config);
   const [isDraggingMusic, setIsDraggingMusic] = useState(false);
   const [isUploadingGanesha, setIsUploadingGanesha] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("Changes Saved Successfully!");
+
+  // Backup & Restore State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importPreviewData, setImportPreviewData] = useState<{
+    fileName: string;
+    exportedAt?: string;
+    weddingGroom?: string;
+    weddingBride?: string;
+    eventsCount: number;
+    galleryCount: number;
+    rsvpsCount: number;
+    config: WeddingConfig | null;
+    rsvps: RSVPRecord[];
+    restoreConfig: boolean;
+    restoreRsvps: boolean;
+    rsvpImportMode: "replace" | "merge";
+  } | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [dbDiagnostics, setDbDiagnostics] = useState<{
     settings: boolean;
@@ -544,6 +564,206 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
     document.body.removeChild(link);
   };
 
+  // Export full wedding data backup as a downloadable JSON file
+  const handleExportData = () => {
+    try {
+      const backupData = {
+        app: "Royal Hindu Wedding Invitation",
+        appletId: "5cdd2c03-d01a-4805-a62a-d4966a1b77ce",
+        backupVersion: "1.0",
+        exportedAt: new Date().toISOString(),
+        wedding: {
+          groom: editConfig.groom?.name || "Naman Agrawal",
+          bride: editConfig.bride?.name || "Nishi Agrawal",
+          date: editConfig.weddingDate || "2026-11-25",
+          hashtag: editConfig.hashtag || "#NamanWedsNishi"
+        },
+        summary: {
+          eventsCount: editConfig.events?.length || 0,
+          galleryPhotosCount: editConfig.galleryImages?.length || 0,
+          rsvpsCount: rsvps.length
+        },
+        config: editConfig,
+        rsvps: rsvps
+      };
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const dateStr = new Date().toISOString().split("T")[0];
+      const groomClean = (editConfig.groom?.name || "naman").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const brideClean = (editConfig.bride?.name || "nishi").toLowerCase().replace(/[^a-z0-9]/g, "");
+      a.href = url;
+      a.download = `${groomClean}-${brideClean}-wedding-backup-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setToastMessage("Data Backup Exported Successfully!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err: any) {
+      alert("Failed to export backup: " + (err.message || String(err)));
+    }
+  };
+
+  // Handle selecting a JSON backup file to import
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // Reset input so same file can be chosen again if needed
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        let configCandidate: WeddingConfig | null = null;
+        let rsvpsCandidate: RSVPRecord[] = [];
+
+        // Check format: full backup format or direct config
+        if (parsed.config && typeof parsed.config === "object") {
+          configCandidate = parsed.config;
+        } else if (parsed.groom && parsed.bride && parsed.events) {
+          configCandidate = parsed as WeddingConfig;
+        }
+
+        if (Array.isArray(parsed.rsvps)) {
+          rsvpsCandidate = parsed.rsvps;
+        } else if (Array.isArray(parsed)) {
+          rsvpsCandidate = parsed;
+        }
+
+        if (!configCandidate && rsvpsCandidate.length === 0) {
+          alert("Invalid backup file: Could not find valid wedding configuration or RSVP data in this JSON file.");
+          return;
+        }
+
+        setImportPreviewData({
+          fileName: file.name,
+          exportedAt: parsed.exportedAt || undefined,
+          weddingGroom: parsed.wedding?.groom || configCandidate?.groom?.name || "Unknown",
+          weddingBride: parsed.wedding?.bride || configCandidate?.bride?.name || "Unknown",
+          eventsCount: configCandidate?.events?.length || 0,
+          galleryCount: configCandidate?.galleryImages?.length || 0,
+          rsvpsCount: rsvpsCandidate.length,
+          config: configCandidate,
+          rsvps: rsvpsCandidate,
+          restoreConfig: Boolean(configCandidate),
+          restoreRsvps: rsvpsCandidate.length > 0,
+          rsvpImportMode: "replace"
+        });
+        setShowImportModal(true);
+      } catch (err: any) {
+        alert("Failed to parse JSON backup file: " + (err.message || "Invalid JSON format"));
+      }
+    };
+    reader.onerror = () => {
+      alert("Error reading file from disk.");
+    };
+    reader.readAsText(file);
+  };
+
+  // Confirm and apply the imported backup
+  const handleConfirmImport = async () => {
+    if (!importPreviewData) return;
+    setIsRestoring(true);
+    try {
+      const summaryParts: string[] = [];
+
+      // 1. Restore Config if chosen
+      if (importPreviewData.restoreConfig && importPreviewData.config) {
+        const mergedConfig: WeddingConfig = {
+          ...defaultWeddingConfig,
+          ...importPreviewData.config,
+          groom: { ...defaultWeddingConfig.groom, ...(importPreviewData.config.groom || {}) },
+          bride: { ...defaultWeddingConfig.bride, ...(importPreviewData.config.bride || {}) },
+          events: importPreviewData.config.events || defaultWeddingConfig.events,
+          galleryImages: importPreviewData.config.galleryImages || defaultWeddingConfig.galleryImages,
+        };
+
+        setEditConfig(mergedConfig);
+        await onConfigChange(mergedConfig);
+        summaryParts.push("Settings & Ceremonies restored");
+      }
+
+      // 2. Restore RSVPs if chosen
+      if (importPreviewData.restoreRsvps && importPreviewData.rsvps.length > 0) {
+        if (importPreviewData.rsvpImportMode === "replace") {
+          // Clear old RSVPs
+          if (isSupabaseEnabled && supabase) {
+            await supabase.from("rsvps").delete().neq("id", "0");
+          } else {
+            for (const old of rsvps) {
+              try {
+                await deleteDoc(doc(db, "rsvps", old.id));
+              } catch (e) {
+                // Ignore single delete error
+              }
+            }
+          }
+        }
+
+        // Write restored RSVPs
+        if (isSupabaseEnabled && supabase) {
+          const formatted = importPreviewData.rsvps.map((r) => ({
+            name: r.name || "Guest",
+            phone: r.phone || "",
+            guestsCount: Number(r.guestsCount ?? (r as any).guests_count ?? 1),
+            guests_count: Number(r.guestsCount ?? (r as any).guests_count ?? 1),
+            attend: r.attend !== false,
+            message: r.message || "",
+            timestamp: r.timestamp || new Date().toISOString()
+          }));
+          await supabase.from("rsvps").insert(formatted);
+        } else {
+          // Firestore batch write
+          try {
+            const batch = writeBatch(db);
+            for (const r of importPreviewData.rsvps) {
+              const docRef = r.id ? doc(db, "rsvps", r.id) : doc(collection(db, "rsvps"));
+              batch.set(docRef, {
+                name: r.name || "Guest",
+                phone: r.phone || "",
+                guestsCount: Number(r.guestsCount ?? (r as any).guests_count ?? 1),
+                attend: r.attend !== false,
+                message: r.message || "",
+                timestamp: r.timestamp || new Date().toISOString()
+              });
+            }
+            await batch.commit();
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, "rsvps");
+          }
+        }
+
+        // Update local rsvps state
+        if (importPreviewData.rsvpImportMode === "replace") {
+          setRsvps(importPreviewData.rsvps);
+        } else {
+          const existingIds = new Set(rsvps.map(r => r.id));
+          const added = importPreviewData.rsvps.filter(r => !existingIds.has(r.id));
+          setRsvps([...rsvps, ...added]);
+        }
+
+        summaryParts.push(`${importPreviewData.rsvps.length} RSVPs restored`);
+      }
+
+      setShowImportModal(false);
+      setToastMessage(`Backup restored successfully! ${summaryParts.join(" & ")}`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
+    } catch (err: any) {
+      console.error("Restore failed:", err);
+      alert("Failed to restore data: " + (err.message || String(err)));
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const totalAttending = rsvps
     .filter((r) => r.attend)
     .reduce((sum, r) => sum + Number(r.guestsCount), 0);
@@ -581,12 +801,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                   Manage Content & RSVPs
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="text-pink-800/60 hover:text-pink-900 text-xs uppercase tracking-wider font-semibold border border-pink-300/20 rounded-full px-4 py-1.5 cursor-pointer transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                {isAuthenticated && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-pink-900 bg-pink-100 hover:bg-pink-200 border border-pink-300/60 text-xs uppercase tracking-wider font-bold rounded-xl px-3 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      title="Import data backup JSON"
+                    >
+                      <Upload size={13} className="text-pink-700" />
+                      <span className="hidden sm:inline">Import Data</span>
+                      <span className="sm:hidden">Import</span>
+                    </button>
+                    <button
+                      onClick={handleExportData}
+                      className="text-white bg-gold-gradient hover:opacity-95 text-xs uppercase tracking-wider font-bold rounded-xl px-3 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      title="Export full data backup JSON"
+                    >
+                      <Download size={13} />
+                      <span className="hidden sm:inline">Export Data</span>
+                      <span className="sm:hidden">Export</span>
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={onClose}
+                  className="text-pink-800/60 hover:text-pink-900 text-xs uppercase tracking-wider font-semibold border border-pink-300/20 rounded-full px-3.5 py-1.5 cursor-pointer transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
             {!isAuthenticated ? (
@@ -650,6 +901,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "media" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
                   >
                     <Video size={16} /> Teaser & Media
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("backup")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "backup" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                  >
+                    <HardDrive size={16} /> Backup & Restore
                   </button>
                   <button
                     onClick={() => setActiveTab("database")}
@@ -1439,6 +1696,193 @@ CREATE TABLE public.fs_files (
         </motion.div>
       )}
 
+      {/* Import Preview & Confirmation Modal */}
+      <AnimatePresence>
+        {showImportModal && importPreviewData && (
+          <motion.div
+            key="import-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white border-2 border-pink-300 rounded-3xl p-6 shadow-2xl max-w-lg w-full relative space-y-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-pink-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-pink-100 text-pink-800 flex items-center justify-center">
+                    <Upload size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-display text-lg text-pink-900 font-bold">Restore Backup</h4>
+                    <p className="text-[11px] text-gray-500">Review details before applying</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  disabled={isRestoring}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-full cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* File Info Card */}
+              <div className="bg-pink-50/60 border border-pink-200/80 rounded-xl p-3 text-xs space-y-1.5">
+                <div className="flex justify-between text-gray-600">
+                  <span>File:</span>
+                  <span className="font-mono font-medium text-pink-950 truncate max-w-[240px]">{importPreviewData.fileName}</span>
+                </div>
+                {importPreviewData.exportedAt && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Exported Date:</span>
+                    <span className="font-medium text-gray-800">{new Date(importPreviewData.exportedAt).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-gray-600">
+                  <span>Couple:</span>
+                  <span className="font-bold text-pink-900">{importPreviewData.weddingGroom} & {importPreviewData.weddingBride}</span>
+                </div>
+              </div>
+
+              {/* Detected Content Chips */}
+              <div>
+                <label className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold block mb-2">
+                  Detected Backup Contents
+                </label>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl">
+                    <span className="text-[10px] text-amber-700 block uppercase">Events</span>
+                    <span className="text-base font-bold text-amber-900">{importPreviewData.eventsCount}</span>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 p-2 rounded-xl">
+                    <span className="text-[10px] text-purple-700 block uppercase">Photos</span>
+                    <span className="text-base font-bold text-purple-900">{importPreviewData.galleryCount}</span>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-xl">
+                    <span className="text-[10px] text-emerald-700 block uppercase">RSVPs</span>
+                    <span className="text-base font-bold text-emerald-900">{importPreviewData.rsvpsCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Restore Options Selection */}
+              <div className="space-y-3 pt-2">
+                <label className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold block">
+                  Select Data to Restore
+                </label>
+
+                {importPreviewData.config && (
+                  <label className="flex items-start gap-3 p-3 rounded-xl border border-pink-200 bg-white hover:bg-pink-50/30 cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={importPreviewData.restoreConfig}
+                      onChange={(e) => setImportPreviewData({ ...importPreviewData, restoreConfig: e.target.checked })}
+                      className="mt-1 w-4 h-4 accent-pink-700 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-pink-950 block">Wedding Settings & Content</span>
+                      <span className="text-[11px] text-gray-500">
+                        Couple names & bios, {importPreviewData.eventsCount} ceremonies, {importPreviewData.galleryCount} gallery pictures, music & media links.
+                      </span>
+                    </div>
+                  </label>
+                )}
+
+                {importPreviewData.rsvpsCount > 0 && (
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-3 p-3 rounded-xl border border-pink-200 bg-white hover:bg-pink-50/30 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={importPreviewData.restoreRsvps}
+                        onChange={(e) => setImportPreviewData({ ...importPreviewData, restoreRsvps: e.target.checked })}
+                        className="mt-1 w-4 h-4 accent-pink-700 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-pink-950 block">
+                          Guest RSVPs ({importPreviewData.rsvpsCount} entries)
+                        </span>
+                        <span className="text-[11px] text-gray-500">
+                          Restore guest attendance responses, phone numbers, and heartfelt wishes.
+                        </span>
+                      </div>
+                    </label>
+
+                    {importPreviewData.restoreRsvps && (
+                      <div className="ml-7 p-2.5 rounded-xl bg-gray-50 border border-gray-200 space-y-1.5 text-xs text-gray-700">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block">
+                          RSVP Import Strategy:
+                        </span>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="rsvpMode"
+                            checked={importPreviewData.rsvpImportMode === "replace"}
+                            onChange={() => setImportPreviewData({ ...importPreviewData, rsvpImportMode: "replace" })}
+                            className="accent-pink-700 cursor-pointer"
+                          />
+                          <span>Replace existing RSVPs with backup entries</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="rsvpMode"
+                            checked={importPreviewData.rsvpImportMode === "merge"}
+                            onChange={() => setImportPreviewData({ ...importPreviewData, rsvpImportMode: "merge" })}
+                            className="accent-pink-700 cursor-pointer"
+                          />
+                          <span>Merge backup with existing RSVPs</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Warning note */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 flex items-start gap-2">
+                <AlertCircle size={15} className="text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  Confirming will update your active database records in real-time. Please make sure you want to apply these changes.
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2 border-t border-pink-200">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  disabled={isRestoring}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 font-semibold text-xs uppercase tracking-wider hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={isRestoring || (!importPreviewData.restoreConfig && !importPreviewData.restoreRsvps)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gold-gradient text-white font-bold text-xs uppercase tracking-wider shadow-md hover:opacity-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isRestoring ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Restoring...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} /> Confirm & Restore
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Toast Notification */}
       <AnimatePresence>
         {showToast && (
@@ -1450,7 +1894,7 @@ CREATE TABLE public.fs_files (
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 border border-emerald-400"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            Changes Saved Successfully!
+            {toastMessage}
           </motion.div>
         )}
       </AnimatePresence>

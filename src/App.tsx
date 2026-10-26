@@ -355,7 +355,7 @@ export default function App() {
   return () => clearInterval(interval);
   }, []);
 
-  // Handle Audio Player
+  // Handle Audio Player & Preloading
   useEffect(() => {
     let isCancelled = false;
 
@@ -367,72 +367,64 @@ export default function App() {
       return;
     }
 
-    const loadAudio = async () => {
+    const initAudio = async () => {
       try {
-        const actualUrl = await fetchFromFsdb(config.musicUrl);
+        const actualUrl = config.musicUrl.startsWith("fsdb://")
+          ? await fetchFromFsdb(config.musicUrl)
+          : config.musicUrl;
+
         if (isCancelled || !actualUrl) return;
 
         let audio = audioRef.current;
         let isNew = false;
 
         if (!audio) {
-          audio = new Audio(actualUrl);
+          audio = new Audio();
           audio.loop = true;
-          
-          if (!actualUrl.startsWith("data:") && !actualUrl.startsWith("blob:")) {
-            audio.crossOrigin = "anonymous";
-          } else {
-            audio.crossOrigin = null;
-          }
-          
-          audio.addEventListener('error', (e) => {
-            console.log("Audio playback error. Retrying without crossOrigin...");
-            if (audioRef.current) {
-              audioRef.current.crossOrigin = null;
-              const currentSrc = audioRef.current.src;
-              audioRef.current.src = "";
-              audioRef.current.src = currentSrc;
-              audioRef.current.load();
-              if (musicPlayingRef.current) {
-                audioRef.current.play().catch(err => console.log("Audio fallback play blocked:", err));
-              }
+          audio.preload = "auto";
+          // Standard cross-origin audio playback does not need crossOrigin="anonymous"
+          audio.src = actualUrl;
+          audio.load();
+
+          audio.addEventListener("playing", () => {
+            setMusicPlaying(true);
+          });
+          audio.addEventListener("pause", () => {
+            if (audioRef.current?.paused) {
+              setMusicPlaying(false);
             }
-          }, { once: true });
-          
+          });
+
           audioRef.current = audio;
           isNew = true;
         } else {
           const currentSrc = audio.src;
-          const targetSrc = actualUrl.startsWith('data:') || actualUrl.startsWith('blob:') ? actualUrl : new URL(actualUrl, window.location.href).href;
-          
+          const targetSrc = actualUrl.startsWith("data:") || actualUrl.startsWith("blob:")
+            ? actualUrl
+            : new URL(actualUrl, window.location.href).href;
+
           if (currentSrc !== targetSrc) {
             audio.pause();
-            if (!actualUrl.startsWith("data:") && !actualUrl.startsWith("blob:")) {
-              audio.crossOrigin = "anonymous";
-            } else {
-              audio.crossOrigin = null;
-            }
+            audio.preload = "auto";
             audio.src = actualUrl;
             audio.load();
             isNew = true;
           }
         }
 
-        // Auto play if it was already playing
+        // Auto play if music was already toggled on
         if (musicPlayingRef.current && (isNew || audio.paused)) {
-          audio.play().catch(e => console.log("Audio play blocked or source unsupported:", e));
+          audio.play().catch(e => console.log("Audio autoplay attempt:", e));
         }
       } catch (e) {
-        console.log("Failed to load audio", e);
+        console.warn("Failed to initialize audio:", e);
       }
     };
 
-    loadAudio();
+    initAudio();
 
-
-  return () => {
+    return () => {
       isCancelled = true;
-      // Clean up only when unmounting the whole component
     };
   }, [config.musicUrl]);
 
@@ -451,23 +443,48 @@ export default function App() {
 
     window.addEventListener("scroll", handleScroll);
 
-  return () => window.removeEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
 
   // Start background music immediately on user's direct click/tap gesture (e.g. wax seal)
   const startMusicPlayback = () => {
     setMusicPlaying(true);
-    if (audioRef.current) {
-      audioRef.current.play().catch((err) => {
-        console.log("Direct gesture audio play:", err);
-      });
-    } else if (config.musicUrl) {
-      const audio = new Audio(config.musicUrl);
+    let audio = audioRef.current;
+
+    if (!audio && config.musicUrl) {
+      audio = new Audio();
       audio.loop = true;
       audio.preload = "auto";
+      audio.src = config.musicUrl;
+      audio.load();
       audioRef.current = audio;
-      audio.play().catch((err) => console.log("New audio play attempt:", err));
+    }
+
+    if (audio) {
+      audio.muted = false;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setMusicPlaying(true);
+          })
+          .catch((err) => {
+            console.warn("Direct gesture audio play attempt:", err);
+            // In case of browser strict interaction check, retry on the next immediate touch/click
+            const retryOnAnyTouch = () => {
+              if (audioRef.current) {
+                audioRef.current.muted = false;
+                audioRef.current.play().then(() => setMusicPlaying(true)).catch(() => {});
+              }
+              window.removeEventListener("pointerdown", retryOnAnyTouch);
+              window.removeEventListener("touchstart", retryOnAnyTouch);
+              window.removeEventListener("click", retryOnAnyTouch);
+            };
+            window.addEventListener("pointerdown", retryOnAnyTouch, { once: true });
+            window.addEventListener("touchstart", retryOnAnyTouch, { once: true });
+            window.addEventListener("click", retryOnAnyTouch, { once: true });
+          });
+      }
     }
   };
 
@@ -476,26 +493,10 @@ export default function App() {
     setIsOpened(true);
     setMusicPlaying(true);
     startMusicPlayback();
-    // Try to auto-play background shehnai music
-    if (audioRef.current) {
+    if (audioRef.current && audioRef.current.paused) {
       audioRef.current.play()
         .then(() => setMusicPlaying(true))
-        .catch((error) => {
-          console.log("Audio play blocked by browser. User interaction should allow it.", error);
-          // Set to playing state anyway so the user sees play toggle works on next action
-          setMusicPlaying(true);
-          // Retry playing on body tap
-          const retryPlay = () => {
-            audioRef.current?.play().then(() => {
-              setMusicPlaying(true);
-              document.body.removeEventListener("click", retryPlay);
-            }).catch(e => {
-              console.log("Retry play failed:", e);
-              document.body.removeEventListener("click", retryPlay);
-            });
-          };
-          document.body.addEventListener("click", retryPlay);
-        });
+        .catch(() => {});
     }
   };
 
@@ -536,13 +537,24 @@ export default function App() {
       e.preventDefault();
     }
     
-    if (musicPlaying) {
-      audioRef.current?.pause();
+    let audio = audioRef.current;
+    if (!audio && config.musicUrl) {
+      audio = new Audio(config.musicUrl);
+      audio.loop = true;
+      audio.preload = "auto";
+      audioRef.current = audio;
+    }
+
+    if (!audio) return;
+
+    if (musicPlaying && !audio.paused) {
+      audio.pause();
       setMusicPlaying(false);
     } else {
-      audioRef.current?.play()
+      audio.muted = false;
+      audio.play()
         .then(() => setMusicPlaying(true))
-        .catch(err => console.log("Could not play audio", err));
+        .catch(err => console.warn("Could not play audio:", err));
     }
   };
 

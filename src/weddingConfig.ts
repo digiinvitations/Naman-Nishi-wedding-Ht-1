@@ -85,7 +85,7 @@ export const weddingConfig: WeddingConfig = {
   hashtag: "#NamanWedsNishi",
   heroTagline: "We Are Getting Married",
   // Royal Indian wedding shehnai & instrumental melody
-  musicUrl: "https://www.image2url.com/r2/default/audio/1785770108745-a5a46950-d478-470f-a009-e4114ad223f9.mp3",
+  musicUrl: "https://videotourl.com/audio/1793027155947-97c816cd-e025-4fd7-bc2f-8455c6260135.mp3",
   youtubeEmbedUrl: "https://www.youtube.com/embed/N4YdD_19F0Y",
   envelopeIconUrl: "/ganesha.png",
   thankYouImageUrl: "",

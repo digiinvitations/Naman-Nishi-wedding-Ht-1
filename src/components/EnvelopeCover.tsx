@@ -53,7 +53,8 @@ export const EnvelopeCover: React.FC<EnvelopeCoverProps> = ({
   return (
     <motion.div
       exit={{ opacity: 0, transition: { duration: 0.5, delay: 1.5 } }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#fff0f3]"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#fff0f3] cursor-pointer"
+      onClick={handleOpen}
     >
       {/* Top Triangle */}
       <motion.div 
