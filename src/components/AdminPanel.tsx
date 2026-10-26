@@ -1,0 +1,1460 @@
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Users, Check, X, FileSpreadsheet, Trash2, Key, ChevronDown, ChevronUp, Image as ImageIcon, Calendar, Edit3, Settings, Video, Database, Copy, AlertCircle, CheckCircle2, Eye, EyeOff, Upload } from "lucide-react";
+import { WeddingConfig, WeddingEvent } from "../weddingConfig";
+import { db, handleFirestoreError, OperationType } from "../lib/firebase";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { uploadToFsdb } from "../lib/fsdb";
+import { isSupabaseEnabled, supabase, checkSupabaseTables } from "../lib/supabase";
+import { FirestoreImage } from "./FirestoreImage";
+
+interface RSVPRecord {
+  id: string;
+  name: string;
+  phone: string;
+  guestsCount: number;
+  message: string;
+  attend: boolean;
+  timestamp: string;
+}
+
+interface AdminPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  config: WeddingConfig;
+  onConfigChange: (newConfig: WeddingConfig) => void;
+}
+
+export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config, onConfigChange }) => {
+  const [passcode, setPasscode] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState("");
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [rsvps, setRsvps] = useState<RSVPRecord[]>([]);
+  
+  const [activeTab, setActiveTab] = useState<"rsvps" | "couple" | "events" | "media" | "database">("rsvps");
+
+  // Local state for editing to avoid constant re-renders during typing
+  const [editConfig, setEditConfig] = useState<WeddingConfig>(config);
+  const [isDraggingMusic, setIsDraggingMusic] = useState(false);
+  const [isUploadingGanesha, setIsUploadingGanesha] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  const [dbDiagnostics, setDbDiagnostics] = useState<{
+    settings: boolean;
+    rsvps: boolean;
+    fs_files: boolean;
+    checked: boolean;
+    checking: boolean;
+    error?: string;
+    details?: {
+      settings?: string;
+      rsvps?: string;
+      fs_files?: string;
+    };
+  }>({
+    settings: false,
+    rsvps: false,
+    fs_files: false,
+    checked: false,
+    checking: false
+  });
+
+  useEffect(() => {
+    setEditConfig(config);
+  }, [config]);
+
+  // Auto-save changes in real time
+  useEffect(() => {
+    if (isAuthenticated && isOpen) {
+      // Avoid saving immediately on load, only save if editConfig actually differs
+      if (JSON.stringify(editConfig) !== JSON.stringify(config)) {
+        const timer = setTimeout(() => {
+          onConfigChange(editConfig);
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 2000);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [editConfig, config, isAuthenticated, isOpen, onConfigChange]);
+
+  const runDiagnostics = async () => {
+    setDbDiagnostics(prev => ({ ...prev, checking: true, error: undefined }));
+    try {
+      const res = await checkSupabaseTables();
+      setDbDiagnostics({
+        ...res,
+        checked: true,
+        checking: false
+      });
+    } catch (err: any) {
+      setDbDiagnostics(prev => ({
+        ...prev,
+        checked: true,
+        checking: false,
+        error: err?.message || String(err)
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "database" && isSupabaseEnabled && isOpen) {
+      runDiagnostics();
+    }
+  }, [activeTab, isOpen]);
+
+  // Load RSVPs from database
+  useEffect(() => {
+    if (isOpen) {
+      if (isSupabaseEnabled && supabase) {
+        const fetchSupabaseRSVPs = async () => {
+          try {
+            const { data, error } = await supabase
+              .from("rsvps")
+              .select("*")
+              .order("timestamp", { ascending: false });
+
+            if (error) throw error;
+            if (data) {
+              const mappedData = data.map((item: any) => ({
+                id: item.id?.toString() || Math.random().toString(),
+                name: item.name || "",
+                phone: item.phone || "",
+                guestsCount: item.guestsCount ?? item.guests_count ?? 0,
+                attend: item.attend ?? true,
+                message: item.message || "",
+                timestamp: item.timestamp || new Date().toISOString()
+              })) as RSVPRecord[];
+              setRsvps(mappedData);
+            }
+          } catch (err) {
+            console.warn("Supabase RSVPs fetch error:", err);
+          }
+        };
+
+        fetchSupabaseRSVPs();
+
+        const channel = supabase
+          .channel("rsvps_changes_channel")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "rsvps" },
+            () => {
+              fetchSupabaseRSVPs();
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      } else {
+        const q = query(collection(db, "rsvps"), orderBy("timestamp", "desc"));
+        const unsub = onSnapshot(q, (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as RSVPRecord[];
+          setRsvps(data);
+        }, (err) => {
+          handleFirestoreError(err, OperationType.LIST, "rsvps");
+        });
+        return () => unsub();
+      }
+    }
+  }, [isOpen]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isLocked) {
+      setError("Maximum attempts reached. You are restricted from trying again.");
+      return;
+    }
+
+    if (passcode === "9456") {
+      setIsAuthenticated(true);
+      setError("");
+      setLoginAttempts(0);
+    } else {
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      
+      if (newAttempts >= 3) {
+        setIsLocked(true);
+        setError("Maximum attempts reached. You are restricted from trying again.");
+      } else {
+        setError(`Incorrect Passcode. You have ${3 - newAttempts} attempt(s) left.`);
+      }
+    }
+  };
+
+  const saveChanges = () => {
+    onConfigChange(editConfig);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  // Convert File to Base64 (with automatic compression for large photos, direct read for SVGs/icons)
+  const handleImageUpload = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const isSvg = file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+      const isSmall = file.size < 500000; // < 500KB
+
+      // For SVGs or smaller images (like Ganesha icons), read directly to avoid canvas rasterization / security errors
+      if (isSvg || isSmall) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const rawBase64 = reader.result as string;
+            const fsdbUrl = await uploadToFsdb(rawBase64);
+            resolve(fsdbUrl);
+          } catch {
+            // Graceful fallback to direct data URL if fsdb upload encounters network error
+            resolve(reader.result as string);
+          }
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // For larger photos (>500KB), downscale on canvas
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement("canvas");
+            let width = img.width;
+            let height = img.height;
+            const maxDim = 3840;
+
+            if (width > height) {
+              if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              }
+            } else {
+              if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(event.target?.result as string);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            const compressedBase64 = canvas.toDataURL("image/webp", 0.75);
+            try {
+              const fsdbUrl = await uploadToFsdb(compressedBase64);
+              resolve(fsdbUrl);
+            } catch {
+              resolve(compressedBase64);
+            }
+          } catch {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = () => {
+          resolve(event.target?.result as string);
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleGaneshaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setIsUploadingGanesha(true);
+      try {
+        const isSvg = file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (isSvg) {
+              resolve(reader.result as string);
+              return;
+            }
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              let w = img.width;
+              let h = img.height;
+              const maxDim = 400;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = Math.round((h * maxDim) / w);
+                  w = maxDim;
+                } else {
+                  w = Math.round((w * maxDim) / h);
+                  h = maxDim;
+                }
+              }
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext("2d");
+              if (!ctx) {
+                resolve(reader.result as string);
+                return;
+              }
+              ctx.drawImage(img, 0, 0, w, h);
+              resolve(canvas.toDataURL("image/png"));
+            };
+            img.onerror = () => resolve(reader.result as string);
+            img.src = reader.result as string;
+          };
+          reader.onerror = () => reject(new Error("Failed to read image file"));
+          reader.readAsDataURL(file);
+        });
+
+        setEditConfig(prev => ({ ...prev, envelopeIconUrl: dataUrl }));
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to process image.");
+      } finally {
+        setIsUploadingGanesha(false);
+      }
+    }
+  };
+
+  const renderGaneshaSection = () => (
+    <div className="bg-white/70 p-4 rounded-xl border border-pink-300/30 shadow-sm space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-xs font-bold text-gray-900 flex items-center gap-2">
+            🕉️ Lord Ganesha / Envelope Flap Header Icon
+          </span>
+          <span className="text-[11px] text-gray-600 block mt-0.5">
+            Displayed on the opening envelope flap directly above &ldquo;॥ श्री गणेशाय नमः ॥&rdquo;
+          </span>
+        </div>
+        {editConfig.envelopeIconUrl && editConfig.envelopeIconUrl !== "/ganesha.png" && (
+          <button
+            type="button"
+            onClick={() => setEditConfig(p => ({ ...p, envelopeIconUrl: "/ganesha.png" }))}
+            className="text-[11px] text-pink-700 hover:text-pink-900 underline font-semibold cursor-pointer shrink-0"
+          >
+            Reset to Divine Ganesha
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="w-16 h-16 rounded-xl bg-pink-50 border border-pink-300/40 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
+          <img
+            src={editConfig.envelopeIconUrl || "/ganesha.png"}
+            alt="Lord Ganesha"
+            className="w-full h-full object-contain"
+          />
+        </div>
+
+        <div className="flex-1 w-full space-y-2">
+          <input
+            type="text"
+            value={editConfig.envelopeIconUrl || ""}
+            onChange={e => setEditConfig(p => ({ ...p, envelopeIconUrl: e.target.value.trim() }))}
+            placeholder="Paste direct URL (https://..., Google Drive, ImgBB) or upload below"
+            className="w-full bg-white text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-xs focus:border-pink-300 outline-none"
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={`text-xs font-semibold px-3 py-1.5 rounded-lg border cursor-pointer transition-colors flex items-center gap-1.5 ${
+              isUploadingGanesha 
+                ? "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed" 
+                : "bg-gold-500/20 hover:bg-gold-500/30 text-pink-950 border-pink-300/40 shadow-sm"
+            }`}>
+              <Upload size={13} />
+              {isUploadingGanesha ? "Uploading Icon..." : "Upload Ganesha Icon File (PNG, SVG, JPG)"}
+              <input
+                type="file"
+                accept="image/*,.svg"
+                disabled={isUploadingGanesha}
+                onChange={handleGaneshaUpload}
+                className="hidden"
+              />
+            </label>
+            <span className="text-[10px] text-gray-500">
+              {editConfig.envelopeIconUrl && editConfig.envelopeIconUrl !== "/ganesha.png"
+                ? "✓ Custom Ganesha icon active"
+                : "✓ Using divine Ganesha image"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>, path: "bride" | "groom") => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      try {
+        const base64 = await handleImageUpload(file);
+        setEditConfig(prev => ({
+          ...prev,
+          [path]: {
+            ...prev[path],
+            imageUrl: base64
+          }
+        }));
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to process image.");
+      }
+    }
+  };
+
+  const handleEventChange = (index: number, field: keyof WeddingEvent, value: string) => {
+    const updatedEvents = [...editConfig.events];
+    updatedEvents[index] = { ...updatedEvents[index], [field]: value };
+    setEditConfig(prev => ({ ...prev, events: updatedEvents }));
+  };
+
+  const addEvent = () => {
+    setEditConfig(prev => ({
+      ...prev,
+      events: [...prev.events, {
+        id: Date.now().toString() + "_" + Math.random().toString(36).substring(2, 9),
+        name: "New Event",
+        hindiName: "",
+        date: "Date",
+        time: "Time",
+        venueName: "Venue Name",
+        venueAddress: "Venue Address",
+        imageUrl: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=800&auto=format&fit=crop",
+        mapEmbedUrl: "",
+        mapDirectionsUrl: ""
+      }]
+    }));
+  };
+
+  const deleteEvent = (index: number) => {
+    setEditConfig(prev => {
+      const updated = [...prev.events];
+      updated.splice(index, 1);
+      return { ...prev, events: updated };
+    });
+  };
+
+  const addGalleryPhoto = () => {
+    setEditConfig(prev => ({
+      ...prev,
+      galleryImages: [...prev.galleryImages, { url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=800&auto=format&fit=crop", caption: "New Photo" }]
+    }));
+  };
+
+  const updateGalleryPhoto = (index: number, field: "url"|"caption", value: string) => {
+    setEditConfig(prev => {
+      const updated = [...prev.galleryImages];
+      const cleanValue = field === "url" ? value.trim() : value;
+      updated[index] = { ...updated[index], [field]: cleanValue };
+      return { ...prev, galleryImages: updated };
+    });
+  };
+
+  const deleteGalleryPhoto = (index: number) => {
+    setEditConfig(prev => {
+      const updated = [...prev.galleryImages];
+      updated.splice(index, 1);
+      return { ...prev, galleryImages: updated };
+    });
+  };
+
+  const processYouTubeUrl = (url: string) => {
+    let embedUrl = url;
+    if (url.includes("watch?v=")) {
+      embedUrl = url.replace("watch?v=", "embed/");
+      embedUrl = embedUrl.split("&")[0];
+    } else if (url.includes("youtu.be/")) {
+      embedUrl = url.replace("youtu.be/", "youtube.com/embed/");
+      embedUrl = embedUrl.split("?")[0];
+    } else if (url.includes("youtube.com/shorts/")) {
+      embedUrl = url.replace("youtube.com/shorts/", "youtube.com/embed/");
+      embedUrl = embedUrl.split("?")[0];
+    }
+    setEditConfig(p => ({...p, youtubeEmbedUrl: embedUrl}));
+  };
+
+  const handleDeleteRsvp = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this RSVP entry?")) return;
+    try {
+      if (isSupabaseEnabled && supabase) {
+        await supabase.from("rsvps").delete().eq("id", id);
+      } else {
+        await deleteDoc(doc(db, "rsvps", id));
+      }
+      setRsvps(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `rsvps/${id}`);
+    }
+  };
+
+  const handleClearAllRsvps = async () => {
+    if (window.confirm("Are you sure you want to delete all RSVP entries? This cannot be undone.")) {
+      try {
+        if (isSupabaseEnabled && supabase) {
+          await supabase.from("rsvps").delete().neq("id", "0");
+        } else {
+          for (const r of rsvps) {
+            await deleteDoc(doc(db, "rsvps", r.id));
+          }
+        }
+        setRsvps([]);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, "rsvps");
+      }
+    }
+  };
+
+  const exportToCSV = () => {
+    if (rsvps.length === 0) {
+      alert("No RSVPs to export yet.");
+      return;
+    }
+
+    const headers = ["Name", "Phone", "Status", "Guests Count", "Message", "Timestamp"];
+    const rows = rsvps.map((r) => [
+      r.name,
+      r.phone,
+      r.attend ? "Attending" : "Not Attending",
+      r.guestsCount,
+      `"${r.message.replace(/"/g, '""')}"`,
+      new Date(r.timestamp).toLocaleString()
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "wedding_rsvps.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const totalAttending = rsvps
+    .filter((r) => r.attend)
+    .reduce((sum, r) => sum + Number(r.guestsCount), 0);
+  const totalDeclined = rsvps.filter((r) => !r.attend).length;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div 
+          key="admin-panel-root"
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden"
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/90 backdrop-blur-md"
+            onClick={onClose}
+          />
+
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="relative w-full max-w-4xl bg-white border border-pink-300 rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-pink-300/20 mb-4 shrink-0">
+              <div>
+                <h3 className="font-display text-xl text-pink-900 flex items-center gap-2">
+                  <Settings size={22} className="text-pink-700" /> Host Dashboard
+                </h3>
+                <p className="text-[10px] text-pink-800/60 uppercase tracking-widest mt-0.5">
+                  Manage Content & RSVPs
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-pink-800/60 hover:text-pink-900 text-xs uppercase tracking-wider font-semibold border border-pink-300/20 rounded-full px-4 py-1.5 cursor-pointer transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            {!isAuthenticated ? (
+              <motion.form
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                onSubmit={handleLogin}
+                className="flex flex-col items-center justify-center py-10 space-y-4 my-auto"
+              >
+                <div className="w-12 h-12 rounded-full bg-gold-400/10 flex items-center justify-center text-pink-700 mb-2">
+                  <Key size={24} />
+                </div>
+                <h4 className="font-display text-lg text-pink-900">Enter Host Passcode</h4>
+                <p className="text-xs text-pink-800/60 max-w-xs text-center">
+                  Please enter the secret passcode to access the website management tools.
+                </p>
+                <div className="w-full max-w-xs relative">
+                  <input
+                    type="password"
+                    placeholder="Enter Passcode"
+                    value={passcode}
+                    onChange={(e) => setPasscode(e.target.value)}
+                    disabled={isLocked}
+                    className={`w-full bg-pink-50/50 text-gray-900 border border-pink-300/30 rounded-xl px-4 py-3 text-center focus:outline-none focus:border-pink-300 text-sm tracking-widest placeholder:text-pink-700/30 font-semibold ${isLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    autoFocus
+                  />
+                </div>
+                {error && <p className="text-pink-300 text-xs font-semibold px-2">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={isLocked}
+                  className={`bg-gold-gradient text-white font-bold uppercase text-xs tracking-wider py-2.5 px-6 rounded-xl ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  Unlock Dashboard
+                </button>
+              </motion.form>
+            ) : (
+              <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
+                {/* Sidebar Tabs */}
+                <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:w-48 shrink-0 pb-4 md:pb-0 md:pr-4 border-b md:border-b-0 md:border-r border-pink-300/20 mb-4 md:mb-0 scrollbar-none">
+                  <button
+                    onClick={() => setActiveTab("rsvps")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "rsvps" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                  >
+                    <Users size={16} /> RSVPs
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("couple")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "couple" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                  >
+                    <Edit3 size={16} /> Couple Info
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("events")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "events" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                  >
+                    <Calendar size={16} /> Events Setup
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("media")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "media" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                  >
+                    <Video size={16} /> Teaser & Media
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("database")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 ${activeTab === "database" ? "bg-gold-500/20 text-pink-900" : "text-pink-800/50 hover:bg-gold-500/10"}`}
+                  >
+                    <Database size={16} /> Database Sync
+                  </button>
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto md:pl-4 scrollbar-thin pb-16 md:pb-0">
+                  {activeTab === "rsvps" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
+                      <div className="grid grid-cols-3 gap-3 mb-4 shrink-0">
+                        <div className="bg-pink-50/40 border border-pink-300/10 p-3 rounded-2xl text-center">
+                          <span className="text-[10px] text-pink-800/50 uppercase tracking-wider block">RSVPs</span>
+                          <span className="text-xl md:text-2xl font-display text-pink-900 mt-1 block">{rsvps.length}</span>
+                        </div>
+                        <div className="bg-emerald-950/40 border border-emerald-500/20 p-3 rounded-2xl text-center">
+                          <span className="text-[10px] text-emerald-300/60 uppercase tracking-wider block">Attending</span>
+                          <span className="text-xl md:text-2xl font-display text-emerald-400 mt-1 block">{totalAttending}</span>
+                        </div>
+                        <div className="bg-rose-950/40 border border-rose-500/20 p-3 rounded-2xl text-center">
+                          <span className="text-[10px] text-rose-300/60 uppercase tracking-wider block">Declined</span>
+                          <span className="text-xl md:text-2xl font-display text-rose-400 mt-1 block">{totalDeclined}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center mb-3 shrink-0">
+                        <span className="text-xs text-pink-800/60 font-semibold">Guest Entries ({rsvps.length})</span>
+                        <div className="flex gap-2">
+                          <button onClick={exportToCSV} disabled={rsvps.length === 0} className="text-[11px] bg-emerald-700/80 hover:bg-emerald-600 disabled:opacity-40 text-gray-900 font-bold uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer">
+                            <FileSpreadsheet size={13} /> Export
+                          </button>
+                          <button onClick={handleClearAllRsvps} disabled={rsvps.length === 0} className="text-[11px] bg-rose-800/80 hover:bg-rose-700 disabled:opacity-40 text-gray-900 font-bold uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer">
+                            <Trash2 size={13} /> Reset
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto border border-pink-300/20 rounded-2xl bg-white/50">
+                        {rsvps.length === 0 ? (
+                          <div className="text-center py-12 text-pink-800/40 text-sm">No RSVPs have been submitted yet.</div>
+                        ) : (
+                          <div className="divide-y divide-gold-400/10">
+                            {rsvps.map((record, i) => (
+                              <div key={record.id ? `admin-rsvp-${record.id}-${i}` : `admin-rsvp-idx-${i}`} className="p-3.5 flex flex-col md:flex-row justify-between gap-2.5">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-pink-900 text-sm">{record.name}</span>
+                                    {record.attend ? (
+                                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                        {record.guestsCount} Attending
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/30">Declined</span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-pink-800/50 block mt-0.5">{record.phone}</span>
+                                  {record.message && (
+                                    <p className="text-xs text-pink-900/90 bg-pink-50/30 border border-pink-300/5 p-2 rounded-lg mt-2 italic">&ldquo;{record.message}&rdquo;</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 self-start md:self-center">
+                                  <span className="text-[10px] text-pink-800/40">{new Date(record.timestamp).toLocaleDateString()}</span>
+                                  <button
+                                    onClick={() => handleDeleteRsvp(record.id)}
+                                    title="Delete RSVP"
+                                    className="text-pink-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "couple" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 pb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Groom Info */}
+                        <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                          <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2">Groom Details</h4>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Name</label>
+                            <input type="text" value={editConfig.groom.name} onChange={e => setEditConfig(p => ({...p, groom: {...p.groom, name: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Father's Name</label>
+                            <input type="text" value={editConfig.groom.fatherName} onChange={e => setEditConfig(p => ({...p, groom: {...p.groom, fatherName: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Mother's Name</label>
+                            <input type="text" value={editConfig.groom.motherName} onChange={e => setEditConfig(p => ({...p, groom: {...p.groom, motherName: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Photo (Direct Image URL or Upload)</label>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex gap-2 items-center">
+                                <FirestoreImage src={editConfig.groom.imageUrl} alt="Groom" className="w-10 h-10 rounded-full object-cover border border-pink-300/30 shrink-0" />
+                                <input type="text" value={editConfig.groom.imageUrl} onChange={e => setEditConfig(p => ({...p, groom: {...p.groom, imageUrl: e.target.value.trim()}}))} placeholder="Paste direct image URL (https://... or Google Drive)" className="flex-1 bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                              </div>
+                              <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, "groom")} className="text-xs text-pink-800/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Bio</label>
+                            <textarea value={editConfig.groom.bio} onChange={e => setEditConfig(p => ({...p, groom: {...p.groom, bio: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none min-h-[80px]" />
+                          </div>
+                        </div>
+
+                        {/* Bride Info */}
+                        <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                          <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2">Bride Details</h4>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Name</label>
+                            <input type="text" value={editConfig.bride.name} onChange={e => setEditConfig(p => ({...p, bride: {...p.bride, name: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Father's Name</label>
+                            <input type="text" value={editConfig.bride.fatherName} onChange={e => setEditConfig(p => ({...p, bride: {...p.bride, fatherName: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Mother's Name</label>
+                            <input type="text" value={editConfig.bride.motherName} onChange={e => setEditConfig(p => ({...p, bride: {...p.bride, motherName: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Photo (Direct Image URL or Upload)</label>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex gap-2 items-center">
+                                <FirestoreImage src={editConfig.bride.imageUrl} alt="Bride" className="w-10 h-10 rounded-full object-cover border border-pink-300/30 shrink-0" />
+                                <input type="text" value={editConfig.bride.imageUrl} onChange={e => setEditConfig(p => ({...p, bride: {...p.bride, imageUrl: e.target.value.trim()}}))} placeholder="Paste direct image URL (https://... or Google Drive)" className="flex-1 bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                              </div>
+                              <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, "bride")} className="text-xs text-pink-800/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Bio</label>
+                            <textarea value={editConfig.bride.bio} onChange={e => setEditConfig(p => ({...p, bride: {...p.bride, bio: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none min-h-[80px]" />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                        <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2">General Wedding Settings</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="col-span-1 md:col-span-2 bg-white/60 p-3.5 rounded-xl border border-pink-300/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                            <div>
+                              <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                                <ImageIcon size={14} className="text-pink-700" />
+                                Photo Gallery Section Visibility
+                              </span>
+                              <span className="text-[11px] text-gray-600 block mt-0.5">
+                                {editConfig.showGallery !== false 
+                                  ? "Gallery is currently VISIBLE to guests on the website." 
+                                  : "Gallery is currently HIDDEN from the website."}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEditConfig(p => ({ ...p, showGallery: p.showGallery === false ? true : false }))}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors ${
+                                editConfig.showGallery !== false
+                                  ? "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300"
+                                  : "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300"
+                              }`}
+                            >
+                              {editConfig.showGallery !== false ? <><EyeOff size={13} /> Hide Gallery</> : <><Eye size={13} /> Unhide (Show) Gallery</>}
+                            </button>
+                          </div>
+
+                          <div className="col-span-1 md:col-span-2">
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Hero Section Tagline</label>
+                            <input type="text" value={editConfig.heroTagline} onChange={e => setEditConfig(p => ({...p, heroTagline: e.target.value}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Display Date</label>
+                            <input type="text" value={editConfig.displayDate} onChange={e => setEditConfig(p => ({...p, displayDate: e.target.value}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Countdown Target (YYYY-MM-DDTHH:mm:ss)</label>
+                            <input type="text" value={editConfig.weddingDate} onChange={e => setEditConfig(p => ({...p, weddingDate: e.target.value}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Hashtag</label>
+                            <input type="text" value={editConfig.hashtag} onChange={e => setEditConfig(p => ({...p, hashtag: e.target.value}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div className="col-span-1 md:col-span-2">
+                            {renderGaneshaSection()}
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Thank You Portrait Image (Direct URL or Upload)</label>
+                            <div className="flex gap-2">
+                              <input type="text" value={editConfig.thankYouImageUrl || ""} onChange={e => setEditConfig(p => ({...p, thankYouImageUrl: e.target.value.trim()}))} placeholder="Paste direct image URL (or leave empty to use Gallery 1)" className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                              <input type="file" accept="image/*" onChange={async (e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  try {
+                                    const base64 = await handleImageUpload(e.target.files[0]);
+                                    setEditConfig(prev => ({ ...prev, thankYouImageUrl: base64 }));
+                                  } catch (err) {
+                                    alert(err instanceof Error ? err.message : "Failed to process image.");
+                                  }
+                                }
+                              }} className="text-xs text-pink-800/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer max-w-[120px]" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Background Music (Google Drive URL / Upload)</label>
+                            <div className="flex flex-col gap-2">
+                              <input type="text" value={editConfig.musicUrl} onChange={e => setEditConfig(p => ({...p, musicUrl: e.target.value}))} placeholder="https://drive.google.com/file/d/..." className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                              <div
+                                onDragOver={(e) => { e.preventDefault(); setIsDraggingMusic(true); }}
+                                onDragLeave={() => setIsDraggingMusic(false)}
+                                onDrop={async (e) => {
+                                  e.preventDefault();
+                                  setIsDraggingMusic(false);
+                                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                    const file = e.dataTransfer.files[0];
+                                    if (file.type.startsWith('audio/')) {
+                                      try {
+                                        const base64 = await handleImageUpload(file);
+                                        setEditConfig(prev => ({ ...prev, musicUrl: base64 }));
+                                      } catch (err) {
+                                        alert(err instanceof Error ? err.message : "Failed to process audio file.");
+                                      }
+                                    } else {
+                                      alert("Please drop an audio file.");
+                                    }
+                                  }
+                                }}
+                                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${isDraggingMusic ? 'border-pink-300 bg-gold-400/10' : 'border-pink-300/30 hover:border-pink-300/60'}`}
+                              >
+                                <input type="file" accept="audio/*" onChange={async (e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    try {
+                                      const base64 = await handleImageUpload(e.target.files[0]);
+                                      setEditConfig(prev => ({ ...prev, musicUrl: base64 }));
+                                    } catch (err) {
+                                      alert(err instanceof Error ? err.message : "Failed to process audio file.");
+                                    }
+                                  }
+                                }} className="text-xs text-pink-800/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer w-full" />
+                                <p className="text-xs text-pink-800/60 mt-2">or drag and drop audio file here</p>
+                              </div>
+                              
+                              <div className="mt-3 bg-pink-500/5 p-3 rounded-xl border border-pink-300/10 space-y-2">
+                                <span className="text-[10px] text-pink-800/80 font-bold uppercase tracking-widest block mb-1">Or Select a Ready-To-Use Premium Wedding Track:</span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {[
+                                    { name: "📯 Royal Shehnai", desc: "Auspicious & Celebratory", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+                                    { name: "🪈 Soulful Divine Flute", desc: "Romantic, Soft & Blissful", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+                                    { name: "🪕 Sacred Sitar Harmony", desc: "Elegant & Traditional", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+                                    { name: "🎸 Acoustic Romantic Love", desc: "Modern Sweet Instrumental", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" }
+                                  ].map((track) => (
+                                    <button
+                                      key={track.url}
+                                      type="button"
+                                      onClick={() => {
+                                        setEditConfig(p => ({ ...p, musicUrl: track.url }));
+                                      }}
+                                      className={`text-left p-2 rounded-lg border transition-all text-xs cursor-pointer ${
+                                        editConfig.musicUrl === track.url
+                                          ? "bg-pink-100 border-pink-400 text-pink-900 shadow-sm"
+                                          : "bg-white/40 border-pink-300/20 text-gray-700 hover:bg-white/70 hover:border-pink-300/40"
+                                      }`}
+                                    >
+                                      <div className="font-semibold">{track.name}</div>
+                                      <div className="text-[9px] text-gray-500">{track.desc}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                                <p className="text-[10px] text-amber-800 mt-1 leading-relaxed">
+                                  ⚠️ <strong>Direct Upload Note:</strong> Because of Firestore's 1MB database size limit, uploaded audio files must be under 800KB. For full-length custom songs, please paste a direct web URL of your <code>.mp3</code> file in the input box above.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                        <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2">Footer Details</h4>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Footer Message</label>
+                            <textarea value={editConfig.familyDetails.message} onChange={e => setEditConfig(p => ({...p, familyDetails: {...p.familyDetails, message: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none min-h-[60px]" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Welcoming Text</label>
+                            <input type="text" value={editConfig.familyDetails.welcomingText} onChange={e => setEditConfig(p => ({...p, familyDetails: {...p.familyDetails, welcomingText: e.target.value}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Family Names (Comma separated)</label>
+                            <input type="text" value={editConfig.familyDetails.names.join(', ')} onChange={e => setEditConfig(p => ({...p, familyDetails: {...p.familyDetails, names: e.target.value.split(',').map(s => s.trim())}}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button onClick={saveChanges} className="w-full bg-gold-gradient text-white font-bold uppercase text-sm tracking-wider py-3 rounded-xl cursor-pointer">
+                        Save Changes
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "events" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 pb-6">
+                      {editConfig.events.map((event, index) => (
+                        <div key={`event-${index}`} className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4 relative">
+                          <div className="flex justify-between items-center border-b border-pink-300/20 pb-2">
+                            <h4 className="font-display text-pink-900 text-lg">{event.name}</h4>
+                            <button onClick={() => deleteEvent(index)} className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-xs uppercase tracking-widest cursor-pointer">
+                              <Trash2 size={12} /> Remove
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Event Name</label>
+                              <input type="text" value={event.name} onChange={e => handleEventChange(index, "name", e.target.value)} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Date</label>
+                              <input type="text" value={event.date} onChange={e => handleEventChange(index, "date", e.target.value)} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Time</label>
+                              <input type="text" value={event.time} onChange={e => handleEventChange(index, "time", e.target.value)} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Venue Name</label>
+                              <input type="text" value={event.venueName} onChange={e => handleEventChange(index, "venueName", e.target.value)} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                              <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Event Thumbnail Photo (Direct URL or Upload)</label>
+                              <div className="flex flex-col gap-2">
+                                <div className="flex gap-2 items-center">
+                                  <FirestoreImage src={event.imageUrl} alt={event.name} className="w-10 h-10 rounded object-contain bg-black/20 border border-pink-300/30 shrink-0" />
+                                  <input type="text" value={event.imageUrl} onChange={e => handleEventChange(index, "imageUrl", e.target.value.trim())} placeholder="Paste direct image URL (https://..., Google Drive, ImgBB, Unsplash)" className="flex-1 bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                                </div>
+                                <input type="file" accept="image/*" onChange={async (e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    try {
+                                      const base64 = await handleImageUpload(e.target.files[0]);
+                                      handleEventChange(index, "imageUrl", base64);
+                                    } catch (err) {
+                                      alert(err instanceof Error ? err.message : "Failed to process image.");
+                                    }
+                                  }
+                                }} className="text-xs text-pink-800/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer w-full" />
+                              </div>
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                              <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Google Maps Embed Iframe URL</label>
+                              <input type="text" value={event.mapEmbedUrl} onChange={e => handleEventChange(index, "mapEmbedUrl", e.target.value)} placeholder="https://www.google.com/maps/embed?pb=..." className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                              <p className="text-[9px] text-pink-800/50 mt-1">Paste the 'src' value from a Google Maps embed iframe.</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex gap-3">
+                        <button onClick={addEvent} className="flex-1 bg-gold-500/10 hover:bg-gold-500/20 text-pink-900 border border-pink-300/30 font-bold uppercase text-sm tracking-wider py-3 rounded-xl cursor-pointer transition-colors">
+                          + Add New Event
+                        </button>
+                        <button onClick={saveChanges} className="flex-1 bg-gold-gradient text-white font-bold uppercase text-sm tracking-wider py-3 rounded-xl cursor-pointer">
+                          Save Events Setup
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "media" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 pb-6">
+                      {renderGaneshaSection()}
+
+                      <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                        <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2">Hero Background Photo</h4>
+                        <div>
+                          <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Photo (Direct Image URL or Upload)</label>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex gap-2 items-center">
+                              <FirestoreImage src={editConfig.heroImageUrl} alt="Hero" className="w-20 h-12 rounded object-contain bg-black/20 border border-pink-300/30 shrink-0" />
+                              <input type="text" value={editConfig.heroImageUrl} onChange={e => setEditConfig(prev => ({...prev, heroImageUrl: e.target.value.trim()}))} placeholder="Paste direct image URL (https://..., Google Drive, ImgBB, Unsplash)" className="flex-1 bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                            </div>
+                            <input type="file" accept="image/*" onChange={async (e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                try {
+                                  const base64 = await handleImageUpload(e.target.files[0]);
+                                  setEditConfig(prev => ({ ...prev, heroImageUrl: base64 }));
+                                } catch (err) {
+                                  alert(err instanceof Error ? err.message : "Failed to process image.");
+                                }
+                              }
+                            }} className="text-xs text-pink-800/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                        <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2 flex justify-between items-center">
+                          Teaser Video Configuration
+                          {editConfig.youtubeEmbedUrl && (
+                            <button onClick={() => processYouTubeUrl("")} className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-xs uppercase tracking-widest cursor-pointer font-sans">
+                              <Trash2 size={12} /> Remove Video
+                            </button>
+                          )}
+                        </h4>
+                        <div>
+                          <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">YouTube Video Link (Paste regular link or embed link)</label>
+                          <input 
+                            type="text" 
+                            value={editConfig.youtubeEmbedUrl} 
+                            onChange={e => processYouTubeUrl(e.target.value)} 
+                            placeholder="e.g. https://www.youtube.com/watch?v=XXXXXXX"
+                            className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" 
+                          />
+                          <p className="text-[10px] text-amber-400/80 mt-2 font-medium">To disable the video section entirely, simply clear this input field and save.</p>
+                        </div>
+                        {editConfig.youtubeEmbedUrl && (
+                          <div className="aspect-video w-full max-w-sm rounded-lg overflow-hidden border border-pink-300/30 mt-4">
+                            <iframe className="w-full h-full" src={editConfig.youtubeEmbedUrl} frameBorder="0" allowFullScreen />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-pink-50/30 p-4 rounded-2xl border border-pink-300/10 space-y-4">
+                        <div className="border-b border-pink-300/20 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <h4 className="font-display text-pink-900 text-lg flex items-center gap-2">
+                              <ImageIcon size={18} className="text-pink-700" />
+                              Photo Gallery Setup
+                            </h4>
+                            <p className="text-[11px] text-pink-800/70 mt-0.5">
+                              Toggle section visibility and configure couple images and captions.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditConfig(p => ({ ...p, showGallery: p.showGallery === false ? true : false }))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-sm shrink-0 ${
+                              editConfig.showGallery !== false
+                                ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300"
+                                : "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300"
+                            }`}
+                          >
+                            {editConfig.showGallery !== false ? (
+                              <>
+                                <Eye size={14} className="text-emerald-700" />
+                                <span>Gallery: Visible</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff size={14} className="text-rose-700" />
+                                <span>Gallery: Hidden</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Status alert card with action */}
+                        <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                          editConfig.showGallery !== false 
+                            ? "bg-emerald-50/80 border-emerald-200" 
+                            : "bg-rose-50/80 border-rose-200"
+                        }`}>
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-bold text-gray-800 block">
+                              {editConfig.showGallery !== false ? "✓ Photo Gallery is currently Visible on Website" : "✕ Photo Gallery is currently Hidden from Website"}
+                            </span>
+                            <span className="text-[11px] text-gray-600 block">
+                              {editConfig.showGallery !== false 
+                                ? "Guests will be able to see your Photo Gallery carousel and fullscreen viewer on the invitation." 
+                                : "The Photo Gallery section is hidden from the public website for guests."}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditConfig(p => ({ ...p, showGallery: p.showGallery === false ? true : false }))}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer shrink-0 transition-colors ${
+                              editConfig.showGallery !== false
+                                ? "bg-rose-600 hover:bg-rose-700 text-white"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            }`}
+                          >
+                            {editConfig.showGallery !== false ? "Hide Gallery Section" : "Unhide (Show) Gallery Section"}
+                          </button>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Gallery Subtitle</label>
+                          <input type="text" value={editConfig.gallerySubtitle} onChange={e => setEditConfig(p => ({...p, gallerySubtitle: e.target.value}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                        </div>
+                        <div className="space-y-4 mt-4">
+                          {editConfig.galleryImages.map((img, idx) => (
+                            <div key={`admin-gallery-${idx}`} className="flex gap-4 items-center bg-white/40 p-3 rounded-xl border border-pink-300/10 relative">
+                              <FirestoreImage src={img.url} className="w-16 h-16 rounded object-contain bg-black/20 border border-pink-300/20 shrink-0" alt="" />
+                              <div className="flex-1 space-y-2">
+                                <input type="text" value={img.caption} onChange={e => updateGalleryPhoto(idx, "caption", e.target.value)} placeholder="Caption" className="w-full bg-pink-50/50 text-gray-900 border border-pink-300/20 rounded-lg px-2 py-1.5 text-xs focus:border-pink-300 outline-none" />
+                                <div className="flex gap-2 items-center">
+                                  <input type="text" value={img.url} onChange={e => updateGalleryPhoto(idx, "url", e.target.value)} placeholder="Direct URL (https://..., Google Drive, ImgBB)" className="w-full bg-pink-50/50 text-gray-900 border border-pink-300/20 rounded-lg px-2 py-1.5 text-[10px] focus:border-pink-300 outline-none" />
+                                  <input type="file" accept="image/*" onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      try {
+                                        const base64 = await handleImageUpload(e.target.files[0]);
+                                        updateGalleryPhoto(idx, "url", base64);
+                                      } catch (err) {
+                                        alert(err instanceof Error ? err.message : "Failed to process image.");
+                                      }
+                                    }
+                                  }} className="text-[9px] text-pink-800/60 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-gold-500/20 file:text-pink-900 cursor-pointer max-w-[120px]" />
+                                </div>
+                              </div>
+                              <button onClick={() => deleteGalleryPhoto(idx)} className="text-rose-400 hover:text-rose-300 p-2 cursor-pointer transition-colors absolute top-2 right-2">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <button onClick={addGalleryPhoto} className="w-full bg-gold-500/10 hover:bg-gold-500/20 text-pink-900 border border-pink-300/30 font-bold uppercase text-sm tracking-wider py-2 rounded-lg cursor-pointer transition-colors">
+                            + Add Photo
+                          </button>
+                        </div>
+                      </div>
+
+                      <button onClick={saveChanges} className="w-full bg-gold-gradient text-white font-bold uppercase text-sm tracking-wider py-3 rounded-xl cursor-pointer">
+                        Save Media Settings
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "database" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                      <div className="bg-pink-50/30 p-5 rounded-2xl border border-pink-300/10 space-y-4">
+                        <h4 className="font-display text-pink-900 text-lg border-b border-pink-300/20 pb-2 flex items-center gap-2">
+                          <Database size={20} className="text-pink-700" />
+                          Remix Database & Data Isolation Status
+                        </h4>
+
+                        <div className="bg-emerald-50/80 border border-emerald-300/50 rounded-xl p-4 space-y-2">
+                          <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                            <CheckCircle2 size={16} className="text-emerald-600" />
+                            100% Isolated Database Configured
+                          </div>
+                          <p className="text-[11px] text-emerald-800 leading-relaxed">
+                            This website operates with its own isolated Firebase Firestore database. All RSVP responses, guest records, customized photos, audio, and couple details are stored completely separately and will never overlap or mix with the official website or any external data pack.
+                          </p>
+                          <div className="pt-2 border-t border-emerald-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] text-emerald-900 font-mono">
+                            <div><span className="text-emerald-700 font-sans font-semibold">Project ID:</span> amiable-tape-46w9q</div>
+                            <div><span className="text-emerald-700 font-sans font-semibold">Database:</span> ai-studio-remixhinduweddin-...</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-white/40 p-4 rounded-xl border border-pink-300/10 space-y-3">
+                            <span className="text-[10px] text-pink-800/60 uppercase tracking-widest font-semibold">Connection Settings</span>
+                            
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">Database Driver:</span>
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                  <CheckCircle2 size={10} /> Firebase Firestore (Isolated)
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-gray-500 leading-relaxed">
+                                {isSupabaseEnabled 
+                                  ? "Dual-sync mode active with Supabase." 
+                                  : "Using dedicated Google Cloud Firestore with real-time listeners and secure rules."}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="bg-white/40 p-4 rounded-xl border border-pink-300/10 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-pink-800/60 uppercase tracking-widest font-semibold">Table Diagnostics</span>
+                              <button 
+                                onClick={runDiagnostics} 
+                                disabled={dbDiagnostics.checking || !isSupabaseEnabled}
+                                className="text-[10px] text-pink-900 hover:text-pink-700 font-bold uppercase tracking-wider underline disabled:opacity-50 cursor-pointer"
+                              >
+                                {dbDiagnostics.checking ? "Checking..." : "Re-Run Check"}
+                              </button>
+                            </div>
+
+                            <div className="space-y-2.5 text-xs">
+                              <div className="border-b border-pink-300/10 pb-1.5 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-gray-600 font-medium">`settings` Table:</span>
+                                  {!isSupabaseEnabled ? (
+                                    <span className="text-gray-400">N/A</span>
+                                  ) : dbDiagnostics.settings ? (
+                                    <span className="text-emerald-600 font-semibold flex items-center gap-1"><CheckCircle2 size={12} /> Accessible</span>
+                                  ) : (
+                                    <span className="text-rose-600 font-semibold flex items-center gap-1"><X size={12} /> Inaccessible</span>
+                                  )}
+                                </div>
+                                {isSupabaseEnabled && !dbDiagnostics.settings && dbDiagnostics.details?.settings && (
+                                  <div className="bg-rose-50 text-[10px] text-rose-700 font-mono p-1.5 rounded border border-rose-100 overflow-x-auto leading-normal">
+                                    {dbDiagnostics.details.settings}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="border-b border-pink-300/10 pb-1.5 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-gray-600 font-medium">`rsvps` Table:</span>
+                                  {!isSupabaseEnabled ? (
+                                    <span className="text-gray-400">N/A</span>
+                                  ) : dbDiagnostics.rsvps ? (
+                                    <span className="text-emerald-600 font-semibold flex items-center gap-1"><CheckCircle2 size={12} /> Accessible</span>
+                                  ) : (
+                                    <span className="text-rose-600 font-semibold flex items-center gap-1"><X size={12} /> Inaccessible</span>
+                                  )}
+                                </div>
+                                {isSupabaseEnabled && !dbDiagnostics.rsvps && dbDiagnostics.details?.rsvps && (
+                                  <div className="bg-rose-50 text-[10px] text-rose-700 font-mono p-1.5 rounded border border-rose-100 overflow-x-auto leading-normal">
+                                    {dbDiagnostics.details.rsvps}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-gray-600 font-medium">`fs_files` Table:</span>
+                                  {!isSupabaseEnabled ? (
+                                    <span className="text-gray-400">N/A</span>
+                                  ) : dbDiagnostics.fs_files ? (
+                                    <span className="text-emerald-600 font-semibold flex items-center gap-1"><CheckCircle2 size={12} /> Accessible</span>
+                                  ) : (
+                                    <span className="text-rose-600 font-semibold flex items-center gap-1"><X size={12} /> Inaccessible</span>
+                                  )}
+                                </div>
+                                {isSupabaseEnabled && !dbDiagnostics.fs_files && dbDiagnostics.details?.fs_files && (
+                                  <div className="bg-rose-50 text-[10px] text-rose-700 font-mono p-1.5 rounded border border-rose-100 overflow-x-auto leading-normal">
+                                    {dbDiagnostics.details.fs_files}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {isSupabaseEnabled && (!dbDiagnostics.settings || !dbDiagnostics.rsvps || !dbDiagnostics.fs_files) && dbDiagnostics.checked && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex gap-2.5 items-start">
+                            <AlertCircle className="text-amber-600 shrink-0 mt-0.5" size={16} />
+                            <div>
+                              <h5 className="text-xs font-bold text-amber-900">Database Tables Missing</h5>
+                              <p className="text-[11px] text-amber-800 leading-relaxed mt-1">
+                                Supabase credentials are set, but the tables do not exist in your Supabase project yet. 
+                                Please use the SQL schema setup tool below to create the required tables in your Supabase Dashboard SQL Editor.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-pink-50/30 p-5 rounded-2xl border border-pink-300/10 space-y-4">
+                        <div className="flex items-center justify-between border-b border-pink-300/20 pb-2">
+                          <h4 className="font-display text-pink-900 text-lg">
+                            Supabase SQL Setup Guide
+                          </h4>
+                          <button
+                            onClick={() => {
+                              const sqlText = `-- SUPABASE SQL SETUP SCRIPT
+-- Copy and paste this script into your Supabase Dashboard SQL Editor (https://supabase.com)
+-- to automatically create all the tables and setup real-time subscriptions!
+
+-- 1. Create the settings table for saving the dynamic configurations
+CREATE TABLE IF NOT EXISTS public.settings (
+    id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Create the rsvps table for capturing event registrations
+CREATE TABLE IF NOT EXISTS public.rsvps (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    guests_count INTEGER DEFAULT 0,
+    guestsCount INTEGER DEFAULT 0, -- Support both camelCase and snake_case
+    attend BOOLEAN DEFAULT TRUE,
+    message TEXT,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Create the fs_files table for background audio and image upload chunks
+CREATE TABLE IF NOT EXISTS public.fs_files (
+    id TEXT PRIMARY KEY, -- chunkId (e.g. fileId_index)
+    fileId TEXT NOT NULL,
+    index INTEGER NOT NULL,
+    data TEXT NOT NULL, -- Base64 data chunk
+    totalChunks INTEGER NOT NULL,
+    createdAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Disable Row Level Security (RLS) for public access or configure policy:
+-- Note: For simple event invitations, you can disable RLS or allow all reads/writes.
+ALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rsvps DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fs_files DISABLE ROW LEVEL SECURITY;
+
+-- 5. Insert initial empty config if not exists to avoid empty states
+INSERT INTO public.settings (id, data)
+VALUES ('config', '{}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+-- 6. Enable Realtime for the tables safely
+-- We use separate PL/pgSQL DO blocks to handle 'duplicate_object' (42710)
+-- exceptions, meaning they won't halt execution if the table is already in the publication!
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'settings table is already in publication.';
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Could not add settings to publication: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.rsvps;
+EXCEPTION
+    WHEN duplicate_object THEN
+        RAISE NOTICE 'rsvps table is already in publication.';
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Could not add rsvps to publication: %', SQLERRM;
+END $$;`;
+                              navigator.clipboard.writeText(sqlText);
+                              alert("SQL Schema script copied to clipboard successfully!");
+                            }}
+                            className="text-xs bg-gold-gradient text-white font-semibold py-1 px-3 rounded-lg flex items-center gap-1 cursor-pointer"
+                          >
+                            <Copy size={12} /> Copy SQL Script
+                          </button>
+                        </div>
+
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                          Follow these simple steps to complete your database setup:
+                        </p>
+                        
+                        <ol className="list-decimal list-inside text-[11px] text-gray-600 space-y-2 pl-1 leading-relaxed">
+                          <li>Go to your <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-pink-900 font-bold underline">Supabase Dashboard</a> and open your project.</li>
+                          <li>Click on the <strong>"SQL Editor"</strong> icon in the left-hand navigation bar.</li>
+                          <li>Click on <strong>"New Query"</strong> to create a blank query tab.</li>
+                          <li>Click the <strong>"Copy SQL Script"</strong> button above, paste it into the editor, and click <strong>"Run"</strong>.</li>
+                          <li>Once executed, click the <strong>"Re-Run Check"</strong> button in Table Diagnostics to verify active connection!</li>
+                        </ol>
+
+                        <div className="bg-white/50 p-3.5 rounded-xl border border-pink-300/10 max-h-48 overflow-y-auto scrollbar-thin">
+                          <pre className="text-[10px] text-gray-700 font-mono select-all leading-normal whitespace-pre-wrap">
+{`CREATE TABLE public.settings (
+    id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE public.rsvps (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    guests_count INTEGER DEFAULT 0,
+    guestsCount INTEGER DEFAULT 0,
+    attend BOOLEAN DEFAULT TRUE,
+    message TEXT,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE public.fs_files (
+    id TEXT PRIMARY KEY,
+    fileId TEXT NOT NULL,
+    index INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    totalChunks INTEGER NOT NULL,
+    createdAt TIMESTAMPTZ DEFAULT NOW()
+);`}
+                          </pre>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            key="toast"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 border border-emerald-400"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            Changes Saved Successfully!
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AnimatePresence>
+  );
+};
+

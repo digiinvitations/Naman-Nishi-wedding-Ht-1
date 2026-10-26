@@ -1,0 +1,77 @@
+        {allHeartsScratched && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.5 }}
+          >
+        <SectionSeparator />
+
+        {/* 9. COUNTDOWN TIMER SECTION */}
+        <motion.section 
+          id="countdown" 
+          initial={{ opacity: 0, y: 30 }} 
+          whileInView={{ opacity: 1, y: 0 }} 
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+          className="py-12 px-4 relative z-10"
+        >
+          <div className="max-w-2xl mx-auto bg-gradient-to-b from-royal-red-100 via-white to-royal-red-50 border border-gold-500/30 p-6 md:p-8 rounded-3xl shadow-xl text-center">
+            <span className="font-sans text-[10px] uppercase tracking-[0.3em] text-gold-700 font-bold">
+              The Sacred Auspicious Hours
+            </span>
+            <h3 className="font-display text-xl text-red-700 tracking-wider mt-1 mb-6 uppercase font-bold">
+              Counting down to Phere
+            </h3>
+
+            {/* Countdown grid */}
+            <div className="grid grid-cols-4 gap-2 md:gap-4">
+              {/* Days */}
+              <div className="bg-white/90 border border-gold-500/20 p-3 md:p-5 rounded-2xl flex flex-col justify-center items-center shadow-sm">
+                <span className="font-display text-2xl md:text-4xl text-red-700 font-bold tracking-tight">
+                  {timeLeft.days}
+                </span>
+                <span className="font-sans text-[9px] md:text-[11px] text-gold-700/80 uppercase tracking-widest mt-1 font-semibold">
+                  Days
+                </span>
+              </div>
+              
+              {/* Hours */}
+              <div className="bg-white/90 border border-gold-500/20 p-3 md:p-5 rounded-2xl flex flex-col justify-center items-center shadow-sm">
+                <span className="font-display text-2xl md:text-4xl text-red-700 font-bold tracking-tight">
+                  {timeLeft.hours}
+                </span>
+                <span className="font-sans text-[9px] md:text-[11px] text-gold-700/80 uppercase tracking-widest mt-1 font-semibold">
+                  Hours
+                </span>
+              </div>
+
+              {/* Minutes */}
+              <div className="bg-white/90 border border-gold-500/20 p-3 md:p-5 rounded-2xl flex flex-col justify-center items-center shadow-sm">
+                <span className="font-display text-2xl md:text-4xl text-red-700 font-bold tracking-tight">
+                  {timeLeft.minutes}
+                </span>
+                <span className="font-sans text-[9px] md:text-[11px] text-gold-700/80 uppercase tracking-widest mt-1 font-semibold">
+                  Mins
+                </span>
+              </div>
+
+              {/* Seconds */}
+              <div className="bg-white/90 border border-gold-500/20 p-3 md:p-5 rounded-2xl flex flex-col justify-center items-center shadow-sm">
+                <span className="font-display text-2xl md:text-4xl text-rose-600 font-bold tracking-tight min-w-[2ch]">
+                  {timeLeft.seconds}
+                </span>
+                <span className="font-sans text-[9px] md:text-[11px] text-gold-700/80 uppercase tracking-widest mt-1 font-semibold">
+                  Secs
+                </span>
+              </div>
+            </div>
+
+            {/* Heart Divider */}
+            <div className="flex items-center justify-center space-x-2 mt-6">
+              <div className="w-10 h-[0.75px] bg-gold-600/40" />
+              <Heart size={12} className="text-gold-600 fill-gold-600 animate-pulse" />
+              <div className="w-10 h-[0.75px] bg-gold-600/40" />
+            </div>
+          </div>
+        </motion.section>
+        <SectionSeparator />

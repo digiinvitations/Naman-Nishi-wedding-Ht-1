@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Montserrat:wght@300;400;500;600;700&family=Great+Vibes&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Marcellus", serif;
+  --font-accent: "Great Vibes", cursive;
+
+  /* Premium Royal Gold Palette */
+  --color-gold-50: #fbf7ee;
+  --color-gold-100: #f5edd6;
+  --color-gold-200: #ebdbae;
+  --color-gold-300: #dec47f;
+  --color-gold-400: #d1aa56;
+  --color-gold-500: #c28f36;
+  --color-gold-600: #a77528;
+  --color-gold-700: #84571f;
+  --color-gold-800: #623e19;
+  --color-gold-900: #462c12;
+
+  /* Light Pink Theme Palette (Replacing Royal Red) */
+  --color-royal-red-50: #ffffff;
+  --color-royal-red-100: #fff5f8;
+  --color-royal-red-200: #ffe6f0;
+  --color-royal-red-300: #ffd6e8;
+  --color-royal-red-400: #ffc2de;
+  --color-royal-red-500: #ffadd3;
+  --color-royal-red-600: #ff99c9;
+  --color-royal-red-700: #ff85be;
+  --color-royal-red-800: #ffccdf;
+  --color-royal-red-900: #ffe6f0;
+  --color-royal-red-950: #fff0f5;
+}
+
+/* Base styling enhancements for luxurious look */
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-royal-red-950);
+  color: #1a1a1a;
+  overflow-x: hidden;
+}
+
+/* Custom golden gradients and text styles */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #f5edd6 0%, #dec47f 50%, #c28f36 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #c28f36 0%, #dec47f 50%, #ebdbae 100%);
+}
+
+.border-gold-gradient {
+  border-image: linear-gradient(to right, #c28f36, #dec47f, #c28f36) 1;
+}
+
+/* Golden glow animations */
+@keyframes goldGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(222, 196, 127, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(222, 196, 127, 0.8);
+  }
+}
+
+.animate-gold-glow {
+  animation: goldGlow 3s infinite;
+}
+
+/* Smooth custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #4c0519;
+}
+::-webkit-scrollbar-thumb {
+  background: #c28f36;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #dec47f;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

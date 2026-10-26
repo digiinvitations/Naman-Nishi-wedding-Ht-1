@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "WeddingConfig": {
+      "title": "WeddingConfig",
+      "description": "Configuration settings for the wedding e-invitation, customizable by the host",
+      "type": "object",
+      "properties": {
+        "heroImageUrl": { "type": "string" },
+        "bride": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "fatherName": { "type": "string" },
+            "motherName": { "type": "string" },
+            "imageUrl": { "type": "string" },
+            "bio": { "type": "string" }
+          },
+          "required": ["name", "fatherName", "motherName", "imageUrl", "bio"]
+        },
+        "groom": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "fatherName": { "type": "string" },
+            "motherName": { "type": "string" },
+            "imageUrl": { "type": "string" },
+            "bio": { "type": "string" }
+          },
+          "required": ["name", "fatherName", "motherName", "imageUrl", "bio"]
+        },
+        "weddingDate": { "type": "string" },
+        "displayDate": { "type": "string" },
+        "hashtag": { "type": "string" },
+        "musicUrl": { "type": "string" },
+        "youtubeEmbedUrl": { "type": "string" },
+        "envelopeIconUrl": { "type": "string" },
+        "thankYouImageUrl": { "type": "string" },
+        "heroTagline": { "type": "string" },
+        "gallerySubtitle": { "type": "string" },
+        "showGallery": { "type": "boolean" },
+        "galleryImages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "caption": { "type": "string" }
+            },
+            "required": ["url", "caption"]
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "hindiName": { "type": "string" },
+              "date": { "type": "string" },
+              "time": { "type": "string" },
+              "venueName": { "type": "string" },
+              "venueAddress": { "type": "string" },
+              "mapEmbedUrl": { "type": "string" },
+              "mapDirectionsUrl": { "type": "string" },
+              "imageUrl": { "type": "string" },
+              "accentColor": { "type": "string" }
+            },
+            "required": ["id", "name", "date", "time", "venueName", "venueAddress", "imageUrl"]
+          }
+        },
+        "socialLinks": {
+          "type": "object",
+          "properties": {
+            "facebook": { "type": "string" },
+            "instagram": { "type": "string" }
+          },
+          "required": ["facebook", "instagram"]
+        },
+        "familyDetails": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string" },
+            "welcomingText": { "type": "string" },
+            "names": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["message", "welcomingText", "names"]
+        },
+        "welcomeMessage": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "subtitle": { "type": "string" },
+            "text": { "type": "string" }
+          },
+          "required": ["title", "subtitle", "text"]
+        }
+      },
+      "required": [
+        "heroImageUrl",
+        "bride",
+        "groom",
+        "weddingDate",
+        "displayDate",
+        "hashtag",
+        "heroTagline",
+        "galleryImages",
+        "events",
+        "familyDetails",
+        "welcomeMessage"
+      ]
+    },
+    "RSVP": {
+      "title": "RSVP",
+      "description": "Guest RSVP submission record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "guestsCount": { "type": "integer" },
+        "attend": { "type": "boolean" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["name", "phone", "guestsCount", "attend", "timestamp"]
+    },
+    "FSFileChunk": {
+      "title": "FSFileChunk",
+      "description": "Chunked file storage for large media assets such as audio and images",
+      "type": "object",
+      "properties": {
+        "fileId": { "type": "string" },
+        "index": { "type": "integer" },
+        "data": { "type": "string" },
+        "totalChunks": { "type": "integer" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["fileId", "index", "data", "totalChunks", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/settings/{settingId}": {
+      "schema": "WeddingConfig",
+      "description": "Customizable wedding website parameters"
+    },
+    "/rsvps/{rsvpId}": {
+      "schema": "RSVP",
+      "description": "Collection of RSVPs submitted by wedding guests"
+    },
+    "/fsFiles/{chunkId}": {
+      "schema": "FSFileChunk",
+      "description": "Collection of chunked media assets for the invitation"
+    }
+  }
+}

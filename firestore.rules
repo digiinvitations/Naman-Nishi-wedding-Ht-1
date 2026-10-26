@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net - Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper: Validates a Firestore Document ID to prevent ID Poisoning
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper: Get incoming data payload
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Helper: Get existing data payload
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper: Validate RSVP shape, field types, and size boundaries
+    function isValidRsvp(data) {
+      return data.keys().hasAll(['name', 'phone', 'guestsCount', 'attend', 'message', 'timestamp'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30
+        && data.guestsCount is int && data.guestsCount >= 0 && data.guestsCount <= 50
+        && data.attend is bool
+        && data.message is string && data.message.size() <= 1000
+        && data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    // Helper: Validate Config shape and restrict field types / size to protect against Resource Poisoning
+    function isValidConfig(data) {
+      return data.keys().hasAll([
+        'heroImageUrl', 'bride', 'groom', 'weddingDate', 'displayDate',
+        'hashtag', 'musicUrl', 'youtubeEmbedUrl', 'heroTagline',
+        'gallerySubtitle', 'galleryImages', 'events', 'socialLinks',
+        'familyDetails', 'welcomeMessage'
+      ])
+        && (!('showGallery' in data) || data.showGallery is bool)
+        && (!('envelopeIconUrl' in data) || (data.envelopeIconUrl is string && data.envelopeIconUrl.size() <= 1048576))
+        && (!('thankYouImageUrl' in data) || (data.thankYouImageUrl is string && data.thankYouImageUrl.size() <= 1048576))
+        && data.heroImageUrl is string && data.heroImageUrl.size() <= 1048576
+        && data.hashtag is string && data.hashtag.size() <= 100
+        && data.weddingDate is string && data.weddingDate.size() <= 50
+        && data.displayDate is string && data.displayDate.size() <= 100
+        && data.heroTagline is string && data.heroTagline.size() <= 200
+        && data.gallerySubtitle is string && data.gallerySubtitle.size() <= 200
+        && data.galleryImages is list && data.galleryImages.size() <= 100
+        && data.events is list && data.events.size() <= 20;
+    }
+
+    // Helper: Validate FS Files chunks
+    function isValidFsFile(data) {
+      return data.keys().hasAll(['fileId', 'index', 'data', 'totalChunks', 'createdAt'])
+        && data.keys().size() == 5
+        && data.fileId is string && data.fileId.size() <= 128
+        && data.index is int && data.index >= 0
+        && data.data is string && data.data.size() <= 600000
+        && data.totalChunks is int && data.totalChunks >= 1
+        && data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // Settings Collection matching
+    match /settings/{settingId} {
+      // Allow individual config document reads for everyone so the invite displays
+      allow get: if isValidId(settingId);
+      
+      // Allow creating and updating only if it conforms strictly to our schema validation helper
+      allow create, update: if isValidId(settingId) && isValidConfig(incoming());
+    }
+
+    // RSVPs Collection matching
+    match /rsvps/{rsvpId} {
+      // Guests can submit (create) RSVPs if the payload is perfectly valid and safe
+      allow create: if isValidId(rsvpId) && isValidRsvp(incoming());
+
+      // Host panel is allowed to read, list, and delete submitted RSVPs
+      allow get: if isValidId(rsvpId);
+      allow list: if true;
+      allow delete: if isValidId(rsvpId);
+    }
+
+    // FS Files Collection matching
+    match /fsFiles/{chunkId} {
+      // Anyone can read chunked data to render images and hear music
+      allow get: if isValidId(chunkId);
+      allow list: if true;
+      // Anyone can create chunks for uploads (validated structure)
+      allow create: if isValidId(chunkId) && isValidFsFile(incoming());
+    }
+
+    // Connection validation
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}

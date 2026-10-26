@@ -1,0 +1,8 @@
+{
+  "name": "Remix Hindu Wedding template 1",
+  "description": "A premium, customizable Hindu wedding website featuring interactive animations, music, event details, countdown, photo gallery, and RSVP functionality.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
