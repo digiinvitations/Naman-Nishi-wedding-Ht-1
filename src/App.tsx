@@ -1022,52 +1022,6 @@ export default function App() {
               <span className="font-accent text-4xl md:text-5xl text-red-700 mt-1 md:mt-2">&amp;</span>
             </div>
 
-            {/* Groom Section */}
-            <OrnateFrame borderColor="border-gold-600/40 bg-white/60">
-              <div className="flex flex-col items-center text-center p-2">
-                <span className="font-accent text-4xl text-red-700 mb-2">
-                  The Groom
-                </span>
-                
-                {/* Groom Photo with Royal Frame */}
-                <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border-4 border-gold-400 shadow-xl mb-6 group">
-                  <FirestoreImage
-                    src={config.groom.imageUrl}
-                    alt={config.groom.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                    <span className="text-[10px] text-white uppercase tracking-widest font-semibold">
-                      Shri {config.groom.name}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-3">
-                  <h3 className="font-display text-3xl text-red-700 tracking-wider font-bold">
-                    {config.groom.name}
-                  </h3>
-                  <TurbanIcon className="w-8 h-8 text-gold-600" />
-                </div>
-                
-                {/* Parents details */}
-                <div className="my-3 text-gold-800/80 font-sans text-xs uppercase tracking-widest leading-relaxed">
-                  <p className="font-semibold">Beloved Son of</p>
-                  <p className="font-bold text-gold-900 text-sm mt-0.5">
-                    {config.groom.motherName}
-                  </p>
-                  <p className="font-semibold">&amp;</p>
-                  <p className="font-bold text-gold-900 text-sm">
-                    {config.groom.fatherName}
-                  </p>
-                </div>
-
-                <p className="font-sans text-xs md:text-sm text-gray-800 leading-relaxed font-medium mt-4 px-4 border-t border-gold-600/20 pt-4">
-                  {config.groom.bio}
-                </p>
-              </div>
-            </OrnateFrame>
-
             {/* Bride Section */}
             <OrnateFrame borderColor="border-gold-600/40 bg-white/60">
               <div className="flex flex-col items-center text-center p-2">
@@ -1110,6 +1064,52 @@ export default function App() {
 
                 <p className="font-sans text-xs md:text-sm text-gray-800 leading-relaxed font-medium mt-4 px-4 border-t border-gold-600/20 pt-4">
                   {config.bride.bio}
+                </p>
+              </div>
+            </OrnateFrame>
+
+            {/* Groom Section */}
+            <OrnateFrame borderColor="border-gold-600/40 bg-white/60">
+              <div className="flex flex-col items-center text-center p-2">
+                <span className="font-accent text-4xl text-red-700 mb-2">
+                  The Groom
+                </span>
+                
+                {/* Groom Photo with Royal Frame */}
+                <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border-4 border-gold-400 shadow-xl mb-6 group">
+                  <FirestoreImage
+                    src={config.groom.imageUrl}
+                    alt={config.groom.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                    <span className="text-[10px] text-white uppercase tracking-widest font-semibold">
+                      Shri {config.groom.name}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-3">
+                  <h3 className="font-display text-3xl text-red-700 tracking-wider font-bold">
+                    {config.groom.name}
+                  </h3>
+                  <TurbanIcon className="w-8 h-8 text-gold-600" />
+                </div>
+                
+                {/* Parents details */}
+                <div className="my-3 text-gold-800/80 font-sans text-xs uppercase tracking-widest leading-relaxed">
+                  <p className="font-semibold">Beloved Son of</p>
+                  <p className="font-bold text-gold-900 text-sm mt-0.5">
+                    {config.groom.motherName}
+                  </p>
+                  <p className="font-semibold">&amp;</p>
+                  <p className="font-bold text-gold-900 text-sm">
+                    {config.groom.fatherName}
+                  </p>
+                </div>
+
+                <p className="font-sans text-xs md:text-sm text-gray-800 leading-relaxed font-medium mt-4 px-4 border-t border-gold-600/20 pt-4">
+                  {config.groom.bio}
                 </p>
               </div>
             </OrnateFrame>
