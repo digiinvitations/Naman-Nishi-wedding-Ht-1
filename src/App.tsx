@@ -731,11 +731,11 @@ export default function App() {
               className="my-1 sm:my-2"
             >
               <h1 className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-gold-gradient drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] leading-tight select-none flex flex-col md:flex-row items-center justify-center gap-1 md:gap-4 font-bold">
-                <span className="tracking-wide">{config.groom.name}</span>
+                <span className="tracking-wide">{config.bride.name}</span>
                 <span className="font-accent text-3xl sm:text-4xl md:text-5xl text-gold-300 font-normal my-[-4px] md:my-0 select-none">
                   &amp;
                 </span>
-                <span className="tracking-wide">{config.bride.name}</span>
+                <span className="tracking-wide">{config.groom.name}</span>
               </h1>
             </motion.div>
 
@@ -1647,10 +1647,10 @@ export default function App() {
                 href={config.socialLinks.instagram}
                 target="_blank"
                 rel="noreferrer"
-                className="w-12 h-12 rounded-full border-2 border-gold-500 bg-gradient-to-br from-pink-500 via-purple-600 to-amber-500 text-white flex items-center justify-center hover:scale-110 transition-transform shadow-xl cursor-pointer"
+                className="w-10 h-10 rounded-full border border-gold-600/40 text-gold-900 hover:text-red-700 hover:border-gold-600 flex items-center justify-center transition-colors shadow-sm cursor-pointer bg-white"
                 title="Instagram Profile"
               >
-                <Instagram size={22} className="stroke-[2.5]" />
+                <Instagram size={18} className="stroke-[2]" />
               </a>
             </div>
           </div>
@@ -1660,8 +1660,8 @@ export default function App() {
         <footer className="py-12 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden">
           <div className="absolute inset-0 bg-pink-50/50 pointer-events-none" />
           {config.hashtag && (
-            <div className="relative mb-8 px-4">
-              <span className="inline-block px-8 py-3 rounded-full bg-gradient-to-r from-royal-red-950 via-red-900 to-royal-red-950 border-2 border-gold-400 text-gold-300 text-sm md:text-base font-display font-black tracking-[0.25em] uppercase shadow-[0_4px_20px_rgba(222,196,127,0.4)] animate-pulse">
+            <div className="relative mb-6">
+              <span className="font-accent text-3xl md:text-4xl text-red-700 tracking-wider">
                 {config.hashtag}
               </span>
             </div>
