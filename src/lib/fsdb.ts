@@ -114,6 +114,8 @@ export function transformGoogleDriveUrl(url: string): string {
   return url;
 }
 
+let isFsdbQuotaExceeded = false;
+
 export async function fetchFromFsdb(fileUrl: string): Promise<string> {
   if (!fileUrl) return fileUrl;
   if (!fileUrl.startsWith("fsdb://")) return transformGoogleDriveUrl(fileUrl);
@@ -126,6 +128,11 @@ export async function fetchFromFsdb(fileUrl: string): Promise<string> {
   if (idbCache) {
     memoryCache.set(fileUrl, idbCache);
     return idbCache;
+  }
+
+  // If quota was already exceeded during this session, avoid failing network requests
+  if (isFsdbQuotaExceeded) {
+    return "";
   }
 
   const fileId = fileUrl.replace("fsdb://", "");
@@ -151,8 +158,14 @@ export async function fetchFromFsdb(fileUrl: string): Promise<string> {
         base64 += doc.data().data;
       });
       return base64;
-    } catch (error) {
-      console.error("Error fetching from fsdb:", error);
+    } catch (error: any) {
+      const msg = error?.message || String(error);
+      if (msg.includes("Quota exceeded") || msg.includes("quota metric") || msg.includes("offline")) {
+        isFsdbQuotaExceeded = true;
+        console.warn("Firestore daily free quota limit reached while reading fsdb chunks. Using fallback asset.");
+      } else {
+        console.warn("Could not fetch file from fsdb:", msg);
+      }
       return "";
     }
   });

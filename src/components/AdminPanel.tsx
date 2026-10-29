@@ -884,7 +884,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                 <div className="w-full max-w-xs relative">
                   <input
                     type="password"
-                    placeholder="Enter Passcode (9456)"
+                    placeholder="Enter Host Passcode"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                     disabled={isLocked}
