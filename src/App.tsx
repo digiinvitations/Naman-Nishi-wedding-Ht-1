@@ -210,7 +210,13 @@ export default function App() {
   };
 
   // Opening flow states
-  const [isOpened, setIsOpened] = useState(false);
+  const [isOpened, setIsOpened] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("open") === "true" || p.get("skip") === "1" || p.get("preview") === "true";
+    }
+    return false;
+  });
   const [isDateRevealed, setIsDateRevealed] = useState(false);
   const [isMonthRevealed, setIsMonthRevealed] = useState(false);
   const [isYearRevealed, setIsYearRevealed] = useState(false);
@@ -918,14 +924,26 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* Quick Reveal button for accessibility across all mobile devices & hosting */}
+          {!allHeartsScratched && (
+            <div className="mt-2 mb-2 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDateRevealed(true);
+                  setIsMonthRevealed(true);
+                  setIsYearRevealed(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 border border-gold-400/40 text-[11px] font-sans font-bold tracking-wider uppercase transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95"
+              >
+                <Sparkles size={12} className="text-gold-400" />
+                <span>Tap to Reveal Auspicious Date</span>
+              </button>
+            </div>
+          )}
         </motion.section>
 
-        {allHeartsScratched && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.5 }}
-          >
         <SectionSeparator />
 
         {/* 9. COUNTDOWN TIMER SECTION */}
@@ -1724,8 +1742,6 @@ export default function App() {
             </button>
           )}
         </footer>
-        </motion.div>
-      )}
       </div>
 
 

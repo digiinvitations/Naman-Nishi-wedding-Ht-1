@@ -82,10 +82,10 @@ export const Preloader: React.FC<PreloaderProps> = ({
       img.onerror = handleLoad;
     });
 
-    // Safety timeout ensures user is never stuck
+    // Safety timeout ensures user is never stuck on any hosting environment
     const safetyTimer = setTimeout(() => {
       checkComplete();
-    }, 3500);
+    }, 1800);
 
     return () => {
       isCancelled = true;

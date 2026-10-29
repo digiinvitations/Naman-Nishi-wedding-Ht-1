@@ -83,7 +83,7 @@ export const weddingConfig: WeddingConfig = {
   },
   weddingDate: "2026-11-25T14:00:00", // 25th November 2026, 2:00 PM onwards
   displayDate: "Wednesday, 25th November 2026",
-  hashtag: "#NamanWedsNishi",
+  hashtag: "#NISHMAN",
   heroTagline: "We Are Getting Married",
   // Royal Indian wedding shehnai & instrumental melody
   musicUrl: "https://videotourl.com/audio/1793027155947-97c816cd-e025-4fd7-bc2f-8455c6260135.mp3",
