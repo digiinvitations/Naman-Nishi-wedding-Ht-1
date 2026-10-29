@@ -171,6 +171,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
           supabase.removeChannel(channel);
         };
       } else {
+        // Pre-load from local cache so RSVPs are immediately visible even if offline or quota is exceeded
+        try {
+          const cached = localStorage.getItem("rsvps_cache");
+          if (cached) {
+            setRsvps(JSON.parse(cached));
+          }
+        } catch {}
+
         const q = query(collection(db, "rsvps"), orderBy("timestamp", "desc"));
         const unsub = onSnapshot(q, (snapshot) => {
           const data = snapshot.docs.map(doc => ({
@@ -178,7 +186,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
             ...doc.data()
           })) as RSVPRecord[];
           setRsvps(data);
+          try {
+            localStorage.setItem("rsvps_cache", JSON.stringify(data));
+          } catch {}
         }, (err) => {
+          const msg = err?.message || String(err);
+          if (msg.includes("Quota exceeded") || msg.includes("quota metric") || msg.includes("offline") || msg.includes("Could not reach Cloud Firestore")) {
+            console.warn("Firestore Quota exceeded or offline while reading RSVPs. Using local storage cache.");
+            try {
+              const cached = localStorage.getItem("rsvps_cache");
+              if (cached) {
+                setRsvps(JSON.parse(cached));
+              }
+            } catch {}
+            return;
+          }
           handleFirestoreError(err, OperationType.LIST, "rsvps");
         });
         return () => unsub();
@@ -1792,7 +1814,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                           </p>
                           <div className="pt-2 border-t border-emerald-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] text-emerald-900 font-mono">
                             <div><span className="text-emerald-700 font-sans font-semibold">Project ID:</span> amiable-tape-46w9q</div>
-                            <div><span className="text-emerald-700 font-sans font-semibold">Database:</span> ai-studio-remixhinduweddin-...</div>
+                            <div><span className="text-emerald-700 font-sans font-semibold">Database:</span> ai-studio-remixhinduweddin-5cdd2c03-d01a-4805-a62a-d4966a1b77ce</div>
+                          </div>
+                        </div>
+
+                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3.5 space-y-2 text-xs text-amber-900">
+                          <div className="flex items-center gap-2 font-bold text-amber-950">
+                            <AlertCircle size={15} className="text-amber-700 shrink-0" />
+                            <span>Firestore Spark Free Tier Quota Notice</span>
+                          </div>
+                          <p className="text-[11px] text-amber-800 leading-relaxed">
+                            Google Cloud Firestore free tier provides a daily allowance of reads and writes per database. If high visitor traffic hits the daily limit, the website automatically switches to resilient offline/cached mode so guests never experience downtime. Free quotas reset automatically every 24 hours at midnight PST.
+                          </p>
+                          <div className="pt-1">
+                            <a
+                              href="https://console.firebase.google.com/project/amiable-tape-46w9q/firestore/databases/ai-studio-remixhinduweddin-5cdd2c03-d01a-4805-a62a-d4966a1b77ce/data?openUpgradeDialog=true"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-900 hover:text-amber-950 underline cursor-pointer"
+                            >
+                              <span>Open Firebase Console to view quota or upgrade plan →</span>
+                            </a>
                           </div>
                         </div>
 

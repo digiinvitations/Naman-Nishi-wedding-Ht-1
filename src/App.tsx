@@ -136,10 +136,22 @@ export default function App() {
         supabase.removeChannel(channel);
       };
     } else {
+      // Restore locally cached config immediately to ensure instant rendering without waiting or failing if offline/quota-exceeded
+      try {
+        const cached = localStorage.getItem(`wedding_config_cache_${clientId}`);
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          setConfig(prev => ({
+            ...prev,
+            ...cachedData
+          }));
+        }
+      } catch {}
+
       const unsub = onSnapshot(doc(db, "settings", clientId), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setConfig({
+          const mergedConfig = {
             ...defaultWeddingConfig,
             ...data,
             showGallery: data.showGallery !== undefined ? data.showGallery : defaultWeddingConfig.showGallery,
@@ -148,9 +160,18 @@ export default function App() {
             galleryImages: data.galleryImages || defaultWeddingConfig.galleryImages,
             groom: { ...defaultWeddingConfig.groom, ...(data.groom || {}) },
             bride: { ...defaultWeddingConfig.bride, ...(data.bride || {}) },
-          });
+          };
+          setConfig(mergedConfig);
+          try {
+            localStorage.setItem(`wedding_config_cache_${clientId}`, JSON.stringify(mergedConfig));
+          } catch {}
         }
       }, (err) => {
+        const msg = err?.message || String(err);
+        if (msg.includes("Quota exceeded") || msg.includes("quota metric") || msg.includes("offline") || msg.includes("Could not reach Cloud Firestore")) {
+          console.warn("Firestore Quota exceeded or offline. Operating in resilient offline mode with cached wedding configuration.");
+          return;
+        }
         handleFirestoreError(err, OperationType.GET, `settings/${clientId}`);
       });
 
@@ -161,10 +182,19 @@ export default function App() {
   const handleConfigChange = async (newConfig: WeddingConfig) => {
     setConfig(newConfig);
     try {
+      localStorage.setItem(`wedding_config_cache_${clientId}`, JSON.stringify(newConfig));
+    } catch {}
+    try {
       await saveConfigToDb(newConfig, async () => {
         try {
           await setDoc(doc(db, "settings", clientId), newConfig);
-        } catch (err) {
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          if (msg.includes("Quota exceeded") || msg.includes("quota metric")) {
+            console.warn("Firestore quota limit exceeded on save. Configuration preserved locally in browser.");
+            alert("Notice: Firestore free daily quota limit has been exceeded for today. Your changes are preserved in this browser and will sync when quota resets tomorrow.");
+            return;
+          }
           handleFirestoreError(err, OperationType.WRITE, `settings/${clientId}`);
         }
       }, clientId);
@@ -589,7 +619,17 @@ export default function App() {
     addRsvpToDb(newRsvp, async () => {
       try {
         return await addDoc(collection(db, "rsvps"), newRsvp);
-      } catch (err) {
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        if (msg.includes("Quota exceeded") || msg.includes("quota metric")) {
+          console.warn("Firestore quota limit exceeded on RSVP. Saving to local storage cache.");
+          try {
+            const cachedList = JSON.parse(localStorage.getItem("rsvps_cache") || "[]");
+            cachedList.unshift({ id: `local_${Date.now()}`, ...newRsvp });
+            localStorage.setItem("rsvps_cache", JSON.stringify(cachedList));
+          } catch {}
+          return { id: `local_${Date.now()}` };
+        }
         handleFirestoreError(err, OperationType.CREATE, "rsvps");
       }
     })

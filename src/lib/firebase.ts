@@ -15,6 +15,8 @@ async function testConnection() {
   } catch (error) {
     if (error instanceof Error && error.message.includes("the client is offline")) {
       console.warn("Please check your Firebase configuration or internet connection.");
+    } else if (error instanceof Error && (error.message.includes("Quota exceeded") || error.message.includes("quota metric"))) {
+      console.warn("Firestore daily free quota limit exceeded. Operating in resilient offline mode.");
     }
   }
 }
