@@ -3,7 +3,7 @@ import { collection, doc, setDoc, getDocs, query, where } from "firebase/firesto
 import { uploadChunkToDb, fetchChunksFromDb } from "./supabase";
 
 const CHUNK_SIZE = 500000;
-const DIRECT_RETURN_THRESHOLD = 50000; // 50KB
+const DIRECT_RETURN_THRESHOLD = 1000000; // 1MB direct return threshold to avoid Firestore quota limits on Vercel
 
 export async function uploadToFsdb(base64: string): Promise<string> {
   // If it's small enough, just return the base64 directly to save reads/writes

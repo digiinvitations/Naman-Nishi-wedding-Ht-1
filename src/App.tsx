@@ -68,28 +68,8 @@ export default function App() {
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const clientId = urlParams.get("client") || urlParams.get("clientId") || urlParams.get("remix") || "config";
 
-  // Config state for dynamic management initialized instantly from localStorage cache if available
-  const [config, setConfig] = useState<WeddingConfig>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(`wedding_config_cache_${clientId}`);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          return {
-            ...defaultWeddingConfig,
-            ...parsed,
-            showGallery: parsed.showGallery !== undefined ? parsed.showGallery : defaultWeddingConfig.showGallery,
-            showRsvp: parsed.showRsvp === true ? true : false,
-            events: parsed.events || defaultWeddingConfig.events,
-            galleryImages: parsed.galleryImages || defaultWeddingConfig.galleryImages,
-            groom: { ...defaultWeddingConfig.groom, ...(parsed.groom || {}) },
-            bride: { ...defaultWeddingConfig.bride, ...(parsed.bride || {}) },
-          };
-        }
-      } catch {}
-    }
-    return defaultWeddingConfig;
-  });
+  // Config state locked strictly to official defaultWeddingConfig
+  const [config, setConfig] = useState<WeddingConfig>(defaultWeddingConfig);
 
   useEffect(() => {
     if (isSupabaseEnabled && supabase) {
