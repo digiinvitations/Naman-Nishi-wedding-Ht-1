@@ -1718,8 +1718,11 @@ export default function App() {
         <footer className="py-12 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden">
           <div className="absolute inset-0 bg-pink-50/50 pointer-events-none" />
           {config.hashtag && (
-            <div className="relative mb-6">
-              <span className="font-accent text-3xl md:text-4xl text-red-700 tracking-wider">
+            <div className="relative mb-6 flex flex-col items-center">
+              <span className="font-sans text-[10px] sm:text-[11px] uppercase tracking-[0.25em] text-gold-700/90 font-bold mb-1">
+                Our Hashtag
+              </span>
+              <span className="font-accent text-3xl md:text-4xl text-red-700 tracking-wider font-normal">
                 {config.hashtag}
               </span>
             </div>

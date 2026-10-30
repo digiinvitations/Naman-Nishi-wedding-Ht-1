@@ -1259,6 +1259,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                             <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Countdown Target (YYYY-MM-DDTHH:mm:ss)</label>
                             <input type="text" value={editConfig.weddingDate} onChange={e => setEditConfig(p => ({...p, weddingDate: e.target.value}))} className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
                           </div>
+                          <div>
+                            <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Wedding Hashtag</label>
+                            <input type="text" value={editConfig.hashtag} onChange={e => setEditConfig(p => ({...p, hashtag: e.target.value}))} placeholder="#Nishman ki Shadi" className="w-full bg-white/50 text-gray-900 border border-pink-300/30 rounded-lg px-3 py-2 text-sm focus:border-pink-300 outline-none" />
+                          </div>
 
                           <div className="col-span-1 md:col-span-2">
                             {renderGaneshaSection()}
