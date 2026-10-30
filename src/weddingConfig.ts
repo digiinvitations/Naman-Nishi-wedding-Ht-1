@@ -71,44 +71,47 @@ export const weddingConfig: WeddingConfig = {
     name: "Nishi Agrawal",
     fatherName: "Mr Sharad Agrawal",
     motherName: "Mrs Kavita Agrawal",
-    imageUrl: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop",
+    imageUrl: "https://cdn.phototourl.com/member/2026-10-29-1755b09b-2d53-4486-9894-363532543d65.jpg",
     bio: "Graceful, compassionate, and full of life, Nishi illuminates every room with her radiant smile and kind heart. She is the cherished daughter of the Agrawal family."
   },
   groom: {
     name: "Naman Agrawal",
     fatherName: "S/O Late shri Rajesh Agrawal ji",
     motherName: "Mrs Mamta Agrawal Ji",
-    imageUrl: "https://images.unsplash.com/photo-1594191632832-7da2260682fa?q=80&w=800&auto=format&fit=crop",
+    imageUrl: "https://cdn.phototourl.com/member/2026-10-29-5ef996e2-9ec8-46d9-b624-c18181841df0.jpg",
     bio: "A warm-hearted, visionary soul with deep respect for family values, Naman brings warmth, intelligence, and joy to every moment. He is the beloved son of the Agrawal family."
   },
-  weddingDate: "2026-11-25T14:00:00", // 25th November 2026, 2:00 PM onwards
+  weddingDate: "2026-11-25T14:00:00",
   displayDate: "Wednesday, 25th November 2026",
-  hashtag: "#NISHMAN",
+  hashtag: "#nishman",
   heroTagline: "We Are Getting Married",
-  // Royal Indian wedding shehnai & instrumental melody
   musicUrl: "https://videotourl.com/audio/1793027155947-97c816cd-e025-4fd7-bc2f-8455c6260135.mp3",
-  youtubeEmbedUrl: "https://www.youtube.com/embed/N4YdD_19F0Y",
+  youtubeEmbedUrl: "",
   envelopeIconUrl: "/ganesha.png",
-  thankYouImageUrl: "",
+  thankYouImageUrl: "https://cdn.phototourl.com/member/2026-10-26-ef4e3f7c-de06-41d3-aca5-caecb158e6af.jpg",
   showGallery: true,
   showRsvp: false,
   gallerySubtitle: "Glimpses of Our Journey",
   galleryImages: [
     {
-      url: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=800",
-      caption: "Eternal Togetherness"
+      caption: "Eternal Togetherness ✨",
+      url: "https://cdn.phototourl.com/member/2026-10-26-82602818-68b6-4fb8-96e7-65bc49d41457.jpg"
     },
     {
-      url: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=800",
-      caption: "Hand in Hand"
+      caption: "Hand in Hand 💖",
+      url: "https://cdn.phototourl.com/member/2026-10-26-2893966d-4aa2-4fb8-8c4b-031dd9021bc7.jpg"
     },
     {
-      url: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800",
-      caption: "Celebrations of Joy"
+      url: "https://cdn.phototourl.com/member/2026-10-26-08304c70-512e-41e2-bcb3-a012c71fc0fe.jpg",
+      caption: "Celebrations of Joy ✨"
     },
     {
-      url: "https://images.unsplash.com/photo-1532712938310-34cb3982ef74?auto=format&fit=crop&w=800",
-      caption: "The Sacred Mandap"
+      url: "https://cdn.phototourl.com/member/2026-10-26-15991930-45ca-430a-a499-1e950620ae7a.jpg",
+      caption: "The Sacred Mandap 😍"
+    },
+    {
+      url: "https://cdn.phototourl.com/member/2026-10-26-cb999368-a102-4f39-b409-bdb40d6c51b6.jpg",
+      caption: "👰Love birds 🤵"
     }
   ],
   events: [
@@ -120,9 +123,9 @@ export const weddingConfig: WeddingConfig = {
       time: "8:00 PM onwards",
       venueName: "Shanvi Landmark Panna",
       venueAddress: "Shanvi Landmark, Panna, Madhya Pradesh",
-      mapEmbedUrl: "https://maps.google.com/maps?q=Shanvi+Landmark+Panna&t=&z=13&ie=UTF8&iwloc=&output=embed",
+      mapEmbedUrl: "",
       mapDirectionsUrl: "https://maps.google.com/?q=Shanvi+Landmark+Panna",
-      imageUrl: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800",
+      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-8568f815-889a-4dba-9b80-4691c9cfbfa0.png",
       accentColor: "from-indigo-800 to-purple-950"
     },
     {
@@ -133,9 +136,9 @@ export const weddingConfig: WeddingConfig = {
       time: "7:00 AM onwards",
       venueName: "Hotel Shanvi Landmark Panna",
       venueAddress: "Hotel Shanvi Landmark, Panna, Madhya Pradesh",
-      mapEmbedUrl: "https://maps.google.com/maps?q=Hotel+Shanvi+Landmark+Panna&t=&z=13&ie=UTF8&iwloc=&output=embed",
+      mapEmbedUrl: "",
       mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Shanvi+Landmark+Panna",
-      imageUrl: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800",
+      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-93a2954a-2b3d-4384-ad23-52dfaa055640.png",
       accentColor: "from-cyan-800 to-sky-950"
     },
     {
@@ -146,28 +149,28 @@ export const weddingConfig: WeddingConfig = {
       time: "2:00 PM onwards",
       venueName: "Hotel Shanvi Landmark",
       venueAddress: "Hotel Shanvi Landmark Panna, Madhya Pradesh",
-      mapEmbedUrl: "https://maps.google.com/maps?q=Hotel+Shanvi+Landmark+Panna&t=&z=13&ie=UTF8&iwloc=&output=embed",
+      mapEmbedUrl: "",
       mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Shanvi+Landmark+Panna",
-      imageUrl: "https://images.unsplash.com/photo-1532712938310-34cb3982ef74?auto=format&fit=crop&w=800",
+      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-39ad2849-6ae9-4257-807a-7fed513ba64a.png",
       accentColor: "from-royal-red-800 to-royal-red-950"
     },
     {
       id: "haldi-mehndi-ceremony",
-      name: "Haldi , Mehndi Ceremony",
+      name: "Nishi ki Haldi & Mehndi Ceremony",
       hindiName: "॥ हल्दी एवं मेहँदी रस्म ॥",
       date: "Friday, 23rd October 2026",
       time: "12:00 PM onwards",
       venueName: "Hotel Mohan Raj Vilas Panna",
       venueAddress: "Hotel Mohan Raj Vilas, Panna, Madhya Pradesh",
-      mapEmbedUrl: "https://maps.google.com/maps?q=Hotel+Mohan+Raj+Vilas+Panna&t=&z=13&ie=UTF8&iwloc=&output=embed",
+      mapEmbedUrl: "",
       mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Mohan+Raj+Vilas+Panna",
-      imageUrl: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=800",
+      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-ab69b998-6000-4096-91f1-9a6782c24f26.png",
       accentColor: "from-amber-600 to-yellow-900"
     }
   ],
   socialLinks: {
-    facebook: "",
-    instagram: "https://www.instagram.com/nishiagrawal__official?cplk=MXJueW51ZzZyMGgzaA=="
+    facebook: "https://facebook.com",
+    instagram: "https://instagram.com"
   },
   familyDetails: {
     message: "With the divine blessings of Lord Ganesha and our revered ancestors, we cordially invite you and your family to grace the auspicious wedding ceremony of Naman & Nishi and bestow your hearty blessings upon the newlyweds.",

@@ -1,0 +1,140 @@
+{
+  "app": "Royal Hindu Wedding Invitation",
+  "appletId": "5cdd2c03-d01a-4805-a62a-d4966a1b77ce",
+  "backupVersion": "1.0",
+  "exportedAt": "2026-10-30T02:27:54.497Z",
+  "wedding": {
+    "groom": "Naman Agrawal",
+    "bride": "Nishi Agrawal",
+    "date": "2026-11-25T14:00:00",
+    "hashtag": "#nishman"
+  },
+  "summary": {
+    "eventsCount": 4,
+    "galleryPhotosCount": 5,
+    "rsvpsCount": 0
+  },
+  "config": {
+    "heroImageUrl": "fsdb://fsdb_1793030619604_fqo9ud0",
+    "bride": {
+      "name": "Nishi Agrawal",
+      "fatherName": "Mr Sharad Agrawal",
+      "motherName": "Mrs Kavita Agrawal",
+      "imageUrl": "https://cdn.phototourl.com/member/2026-10-29-1755b09b-2d53-4486-9894-363532543d65.jpg",
+      "bio": "Graceful, compassionate, and full of life, Nishi illuminates every room with her radiant smile and kind heart. She is the cherished daughter of the Agrawal family."
+    },
+    "groom": {
+      "name": "Naman Agrawal",
+      "fatherName": "S/O Late shri Rajesh Agrawal ji",
+      "motherName": "Mrs Mamta Agrawal Ji",
+      "imageUrl": "https://cdn.phototourl.com/member/2026-10-29-5ef996e2-9ec8-46d9-b624-c18181841df0.jpg",
+      "bio": "A warm-hearted, visionary soul with deep respect for family values, Naman brings warmth, intelligence, and joy to every moment. He is the beloved son of the Agrawal family."
+    },
+    "weddingDate": "2026-11-25T14:00:00",
+    "displayDate": "Wednesday, 25th November 2026",
+    "hashtag": "#nishman",
+    "heroTagline": "We Are Getting Married",
+    "musicUrl": "https://videotourl.com/audio/1793027155947-97c816cd-e025-4fd7-bc2f-8455c6260135.mp3",
+    "youtubeEmbedUrl": "",
+    "envelopeIconUrl": "/ganesha.png",
+    "thankYouImageUrl": "https://cdn.phototourl.com/member/2026-10-26-ef4e3f7c-de06-41d3-aca5-caecb158e6af.jpg",
+    "showGallery": true,
+    "showRsvp": false,
+    "gallerySubtitle": "Glimpses of Our Journey",
+    "galleryImages": [
+      {
+        "caption": "Eternal Togetherness ✨",
+        "url": "https://cdn.phototourl.com/member/2026-10-26-82602818-68b6-4fb8-96e7-65bc49d41457.jpg"
+      },
+      {
+        "caption": "Hand in Hand 💖",
+        "url": "https://cdn.phototourl.com/member/2026-10-26-2893966d-4aa2-4fb8-8c4b-031dd9021bc7.jpg"
+      },
+      {
+        "url": "https://cdn.phototourl.com/member/2026-10-26-08304c70-512e-41e2-bcb3-a012c71fc0fe.jpg",
+        "caption": "Celebrations of Joy ✨"
+      },
+      {
+        "url": "https://cdn.phototourl.com/member/2026-10-26-15991930-45ca-430a-a499-1e950620ae7a.jpg",
+        "caption": "The Sacred Mandap 😍"
+      },
+      {
+        "url": "https://cdn.phototourl.com/member/2026-10-26-cb999368-a102-4f39-b409-bdb40d6c51b6.jpg",
+        "caption": "👰Love birds 🤵"
+      }
+    ],
+    "events": [
+      {
+        "id": "sangeet-ring-ceremony",
+        "name": "Sangeet & Ring ceremony",
+        "mapEmbedUrl": "",
+        "hindiName": "॥ संगीत एवं मुद्रिका रस्म ॥",
+        "venueName": "Shanvi Landmark Panna",
+        "venueAddress": "Shanvi Landmark, Panna, Madhya Pradesh",
+        "accentColor": "from-indigo-800 to-purple-950",
+        "imageUrl": "https://cdn.phototourl.com/member/2026-10-26-8568f815-889a-4dba-9b80-4691c9cfbfa0.png",
+        "mapDirectionsUrl": "https://maps.google.com/?q=Shanvi+Landmark+Panna",
+        "date": "Tuesday, 24th November 2026",
+        "time": "8:00 PM onwards"
+      },
+      {
+        "mapDirectionsUrl": "https://maps.google.com/?q=Hotel+Shanvi+Landmark+Panna",
+        "mapEmbedUrl": "",
+        "imageUrl": "https://cdn.phototourl.com/member/2026-10-26-93a2954a-2b3d-4384-ad23-52dfaa055640.png",
+        "name": "Carnival Party",
+        "accentColor": "from-cyan-800 to-sky-950",
+        "id": "carnival-party",
+        "venueAddress": "Hotel Shanvi Landmark, Panna, Madhya Pradesh",
+        "venueName": "Hotel Shanvi Landmark Panna",
+        "hindiName": "॥ कार्निवल उत्सव ॥",
+        "time": "7:00 AM onwards",
+        "date": "Wednesday, 25th November 2026"
+      },
+      {
+        "name": "Wedding Ceremony",
+        "imageUrl": "https://cdn.phototourl.com/member/2026-10-26-39ad2849-6ae9-4257-807a-7fed513ba64a.png",
+        "mapEmbedUrl": "",
+        "accentColor": "from-royal-red-800 to-royal-red-950",
+        "venueName": "Hotel Shanvi Landmark",
+        "hindiName": "॥ शुभ विवाह (फेरे) ॥",
+        "venueAddress": "Hotel Shanvi Landmark Panna, Madhya Pradesh",
+        "id": "wedding-ceremony",
+        "mapDirectionsUrl": "https://maps.google.com/?q=Hotel+Shanvi+Landmark+Panna",
+        "time": "2:00 PM onwards",
+        "date": "Wednesday, 25th November 2026"
+      },
+      {
+        "name": "Nishi ki Haldi & Mehndi Ceremony",
+        "mapDirectionsUrl": "https://maps.google.com/?q=Hotel+Mohan+Raj+Vilas+Panna",
+        "accentColor": "from-amber-600 to-yellow-900",
+        "date": "Friday, 23rd October 2026",
+        "time": "12:00 PM onwards",
+        "venueAddress": "Hotel Mohan Raj Vilas, Panna, Madhya Pradesh",
+        "id": "haldi-mehndi-ceremony",
+        "hindiName": "॥ हल्दी एवं मेहँदी रस्म ॥",
+        "venueName": "Hotel Mohan Raj Vilas Panna",
+        "mapEmbedUrl": "",
+        "imageUrl": "https://cdn.phototourl.com/member/2026-10-26-ab69b998-6000-4096-91f1-9a6782c24f26.png"
+      }
+    ],
+    "socialLinks": {
+      "facebook": "https://facebook.com",
+      "instagram": "https://instagram.com"
+    },
+    "familyDetails": {
+      "names": [
+        "Agrawal Family (Panna)",
+        "Agrawal Family",
+        "All Relatives and Friends"
+      ],
+      "message": "With the divine blessings of Lord Ganesha and our revered ancestors, we cordially invite you and your family to grace the auspicious wedding ceremony of Naman & Nishi and bestow your hearty blessings upon the newlyweds.",
+      "welcomingText": "Warmly Welcomed By:"
+    },
+    "welcomeMessage": {
+      "text": "Because you have played a very special role in our lives, we would love for you to join us as we embark on this beautiful adventure of marriage. Together with our families, we invite you to share our joy, laughter, and sacred vows.",
+      "subtitle": "We invite you to celebrate our love",
+      "title": "Two Hearts, One Journey"
+    }
+  },
+  "rsvps": []
+}
