@@ -66,7 +66,7 @@ export interface WeddingConfig {
 }
 
 export const weddingConfig: WeddingConfig = {
-  heroImageUrl: "https://images.unsplash.com/photo-1607190074257-dd4b7af0309f?q=100&w=3840&auto=format&fit=crop",
+  heroImageUrl: "https://cdn.phototourl.com/member/2026-10-29-2adcf256-dd0a-4b55-8ad2-ce3b5cb89c52.jpg",
   bride: {
     name: "Nishi Agrawal",
     fatherName: "Mr Sharad Agrawal",

@@ -7,7 +7,7 @@ export function FirestoreImage(props: React.ComponentProps<"img">) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  const universalFallback = "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800";
+  const universalFallback = "https://cdn.phototourl.com/member/2026-10-29-2adcf256-dd0a-4b55-8ad2-ce3b5cb89c52.jpg";
 
   useEffect(() => {
     const cleanSrc = typeof src === "string" ? src.trim() : src;
