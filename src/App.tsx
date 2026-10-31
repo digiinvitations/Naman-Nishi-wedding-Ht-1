@@ -41,8 +41,9 @@ import { EventMap } from "./components/EventMap";
 import confetti from "canvas-confetti";
 
 import { db, handleFirestoreError, OperationType } from "./lib/firebase";
-import { collection, doc, setDoc, onSnapshot, addDoc } from "firebase/firestore";
+import { collection, doc, setDoc, onSnapshot, addDoc, getDoc } from "firebase/firestore";
 import { isSupabaseEnabled, supabase, saveConfigToDb, addRsvpToDb } from "./lib/supabase";
+import { getAppPartitionId, MASTER_PARTITION_ID } from "./lib/appIdentity";
 
 const TurbanIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
@@ -64,9 +65,8 @@ const BindiIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
 );
 
 export default function App() {
-  // Extract client/remix identifier from URL query params (e.g. ?client=October-T1-Client-1)
-  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const clientId = urlParams.get("client") || urlParams.get("clientId") || urlParams.get("remix") || "config";
+  // Guaranteed partitioned client/remix identifier - ensures 100% data isolation for upcoming remixes
+  const clientId = getAppPartitionId();
 
   // Config state locked strictly to official defaultWeddingConfig
   const [config, setConfig] = useState<WeddingConfig>(defaultWeddingConfig);
@@ -148,7 +148,7 @@ export default function App() {
         }
       } catch {}
 
-      const unsub = onSnapshot(doc(db, "settings", clientId), (docSnap) => {
+      const unsub = onSnapshot(doc(db, "settings", clientId), async (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           const mergedConfig = {
@@ -164,6 +164,24 @@ export default function App() {
           setConfig(mergedConfig);
           try {
             localStorage.setItem(`wedding_config_cache_${clientId}`, JSON.stringify(mergedConfig));
+          } catch {}
+        } else if (clientId === MASTER_PARTITION_ID) {
+          try {
+            const legacySnap = await getDoc(doc(db, "settings", "config"));
+            if (legacySnap.exists()) {
+              const data = legacySnap.data();
+              const mergedConfig = {
+                ...defaultWeddingConfig,
+                ...data,
+                showGallery: data.showGallery !== undefined ? data.showGallery : defaultWeddingConfig.showGallery,
+                showRsvp: data.showRsvp === true ? true : false,
+                events: data.events || defaultWeddingConfig.events,
+                galleryImages: data.galleryImages || defaultWeddingConfig.galleryImages,
+                groom: { ...defaultWeddingConfig.groom, ...(data.groom || {}) },
+                bride: { ...defaultWeddingConfig.bride, ...(data.bride || {}) },
+              };
+              setConfig(mergedConfig);
+            }
           } catch {}
         }
       }, (err) => {
@@ -612,8 +630,10 @@ export default function App() {
       return;
     }
 
-    // Save RSVP to database
+    // Save RSVP to database with partitioned clientId for complete isolation
     const newRsvp = {
+      clientId,
+      remixId: clientId,
       name: rsvpName,
       phone: rsvpPhone,
       guestsCount: rsvpAttend ? rsvpGuests : 0,
@@ -630,9 +650,10 @@ export default function App() {
         if (msg.includes("Quota exceeded") || msg.includes("quota metric")) {
           console.warn("Firestore quota limit exceeded on RSVP. Saving to local storage cache.");
           try {
-            const cachedList = JSON.parse(localStorage.getItem("rsvps_cache") || "[]");
+            const cacheKey = `rsvps_cache_${clientId}`;
+            const cachedList = JSON.parse(localStorage.getItem(cacheKey) || "[]");
             cachedList.unshift({ id: `local_${Date.now()}`, ...newRsvp });
-            localStorage.setItem("rsvps_cache", JSON.stringify(cachedList));
+            localStorage.setItem(cacheKey, JSON.stringify(cachedList));
           } catch {}
           return { id: `local_${Date.now()}` };
         }
@@ -739,6 +760,22 @@ export default function App() {
           {/* Systematic Top-to-Half Section Content */}
           <div className="relative z-10 w-full max-w-4xl mx-auto pt-8 sm:pt-12 md:pt-14 pb-4 flex flex-col items-center">
             
+            {/* 0. Royal Wedding Crest / Logo */}
+            {config.logoUrl && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.8 }}
+                className="mb-2 sm:mb-3"
+              >
+                <img
+                  src={config.logoUrl}
+                  alt="Wedding Logo"
+                  className="h-14 sm:h-16 md:h-20 w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.85)] filter brightness-105 hover:scale-105 transition-transform"
+                />
+              </motion.div>
+            )}
+
             {/* 1. Auspicious Invocation Header */}
             <motion.div 
               initial={{ opacity: 0, y: -12 }}
@@ -1715,8 +1752,28 @@ export default function App() {
         </motion.section>
 
         {/* FOOTER */}
-        <footer className="py-12 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden">
+        <footer className="py-14 bg-white text-center relative z-10 flex flex-col justify-center items-center overflow-hidden px-4">
           <div className="absolute inset-0 bg-pink-50/50 pointer-events-none" />
+
+          {/* Royal Logo / Emblem - Prominent, crisp, and clearly visible */}
+          {config.logoUrl && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="relative mb-8 flex flex-col items-center"
+            >
+              <div className="p-3.5 sm:p-5 rounded-3xl bg-white/95 border border-pink-200/90 shadow-md backdrop-blur-xs flex items-center justify-center">
+                <img
+                  src={config.logoUrl}
+                  alt="Wedding Emblem Logo"
+                  className="h-20 sm:h-24 md:h-28 w-auto max-w-[240px] sm:max-w-[280px] md:max-w-[320px] object-contain drop-shadow-sm hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+            </motion.div>
+          )}
+
           {config.hashtag && (
             <div className="relative mb-6 flex flex-col items-center">
               <span className="font-sans text-[10px] sm:text-[11px] uppercase tracking-[0.25em] text-gold-700/90 font-bold mb-1">
@@ -1727,8 +1784,15 @@ export default function App() {
               </span>
             </div>
           )}
-          <div className="relative border border-pink-300 px-6 md:px-10 py-3 bg-white/90 shadow-sm mb-6 rounded-sm">
-            <span className="font-sans text-[10px] md:text-xs uppercase tracking-[0.2em] md:tracking-[0.3em] text-pink-800/80 font-bold whitespace-nowrap">
+          <div className="relative border border-pink-300 px-6 md:px-10 py-3.5 bg-white/95 shadow-sm mb-6 rounded-2xl flex items-center justify-center gap-3">
+            {config.logoUrl && (
+              <img
+                src={config.logoUrl}
+                alt="Logo"
+                className="h-7 sm:h-8 w-auto object-contain shrink-0 drop-shadow-2xs"
+              />
+            )}
+            <span className="font-sans text-[11px] md:text-xs uppercase tracking-[0.2em] md:tracking-[0.25em] text-pink-900 font-bold whitespace-nowrap">
               Create with <span className="text-red-500 animate-pulse inline-block mx-1">❤️</span> by digiinvitations_
             </span>
           </div>
@@ -1830,6 +1894,7 @@ export default function App() {
         onClose={() => setShowAdmin(false)}
         config={config}
         onConfigChange={handleConfigChange}
+        clientId={clientId}
       />
 
     </div>

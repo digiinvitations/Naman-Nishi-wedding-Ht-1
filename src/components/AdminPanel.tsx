@@ -8,6 +8,8 @@ import { uploadToFsdb } from "../lib/fsdb";
 import { isSupabaseEnabled, supabase, checkSupabaseTables } from "../lib/supabase";
 import { FirestoreImage } from "./FirestoreImage";
 
+import { getAppPartitionId, setAppPartitionId, MASTER_PARTITION_ID, UPCOMING_REMIX_PARTITION_ID, KNOWN_PARTITIONS } from "../lib/appIdentity";
+
 interface RSVPRecord {
   id: string;
   name: string;
@@ -16,6 +18,8 @@ interface RSVPRecord {
   message: string;
   attend: boolean;
   timestamp: string;
+  clientId?: string;
+  remixId?: string;
 }
 
 interface AdminPanelProps {
@@ -23,9 +27,19 @@ interface AdminPanelProps {
   onClose: () => void;
   config: WeddingConfig;
   onConfigChange: (newConfig: WeddingConfig) => void;
+  clientId?: string;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config, onConfigChange }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config, onConfigChange, clientId: propClientId }) => {
+  const [activePartitionId, setActivePartitionId] = useState(() => propClientId || getAppPartitionId());
+  const clientId = activePartitionId;
+
+  useEffect(() => {
+    if (propClientId && propClientId !== activePartitionId) {
+      setActivePartitionId(propClientId);
+    }
+  }, [propClientId]);
+
   const [passcode, setPasscode] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState("");
@@ -85,6 +99,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
     setEditConfig(config);
   }, [config]);
 
+  // Always reset authentication when modal closes so password is required every time
+  useEffect(() => {
+    if (!isOpen) {
+      setIsAuthenticated(false);
+      setPasscode("");
+      setError("");
+      setShowImportModal(false);
+    }
+  }, [isOpen]);
+
   // Auto-save changes in real time
   useEffect(() => {
     if (isAuthenticated && isOpen) {
@@ -138,15 +162,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
             if (error) throw error;
             if (data) {
-              const mappedData = data.map((item: any) => ({
-                id: item.id?.toString() || Math.random().toString(),
-                name: item.name || "",
-                phone: item.phone || "",
-                guestsCount: item.guestsCount ?? item.guests_count ?? 0,
-                attend: item.attend ?? true,
-                message: item.message || "",
-                timestamp: item.timestamp || new Date().toISOString()
-              })) as RSVPRecord[];
+              const mappedData = data
+                .filter((item: any) => {
+                  const itemClientId = item.clientId || item.client_id;
+                  if (itemClientId) return itemClientId === clientId;
+                  return clientId === MASTER_PARTITION_ID || clientId === "config";
+                })
+                .map((item: any) => ({
+                  id: item.id?.toString() || Math.random().toString(),
+                  name: item.name || "",
+                  phone: item.phone || "",
+                  guestsCount: item.guestsCount ?? item.guests_count ?? 0,
+                  attend: item.attend ?? true,
+                  message: item.message || "",
+                  timestamp: item.timestamp || new Date().toISOString(),
+                  clientId: item.clientId || item.client_id
+                })) as RSVPRecord[];
               setRsvps(mappedData);
             }
           } catch (err) {
@@ -157,7 +188,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
         fetchSupabaseRSVPs();
 
         const channel = supabase
-          .channel("rsvps_changes_channel")
+          .channel(`rsvps_changes_channel_${clientId}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "rsvps" },
@@ -171,9 +202,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
           supabase.removeChannel(channel);
         };
       } else {
-        // Pre-load from local cache so RSVPs are immediately visible even if offline or quota is exceeded
+        // Pre-load from partition-isolated local cache so RSVPs are immediately visible
+        const partitionCacheKey = `rsvps_cache_${clientId}`;
         try {
-          const cached = localStorage.getItem("rsvps_cache");
+          const cached = localStorage.getItem(partitionCacheKey) || (clientId === MASTER_PARTITION_ID ? localStorage.getItem("rsvps_cache") : null);
           if (cached) {
             setRsvps(JSON.parse(cached));
           }
@@ -181,20 +213,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
         const q = query(collection(db, "rsvps"), orderBy("timestamp", "desc"));
         const unsub = onSnapshot(q, (snapshot) => {
-          const data = snapshot.docs.map(doc => ({
+          const allDocs = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as RSVPRecord[];
-          setRsvps(data);
+          // Strict partition isolation: only display RSVPs belonging to this website
+          const isolatedData = allDocs.filter(r => {
+            if (r.clientId) {
+              return r.clientId === clientId;
+            }
+            return clientId === MASTER_PARTITION_ID || clientId === "config";
+          });
+          setRsvps(isolatedData);
           try {
-            localStorage.setItem("rsvps_cache", JSON.stringify(data));
+            localStorage.setItem(partitionCacheKey, JSON.stringify(isolatedData));
           } catch {}
         }, (err) => {
           const msg = err?.message || String(err);
           if (msg.includes("Quota exceeded") || msg.includes("quota metric") || msg.includes("offline") || msg.includes("Could not reach Cloud Firestore")) {
             console.warn("Firestore Quota exceeded or offline while reading RSVPs. Using local storage cache.");
             try {
-              const cached = localStorage.getItem("rsvps_cache");
+              const cached = localStorage.getItem(partitionCacheKey);
               if (cached) {
                 setRsvps(JSON.parse(cached));
               }
@@ -206,7 +245,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
         return () => unsub();
       }
     }
-  }, [isOpen]);
+  }, [isOpen, clientId]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -544,13 +583,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
     if (window.confirm("Are you sure you want to delete all RSVP entries? This cannot be undone.")) {
       try {
         if (isSupabaseEnabled && supabase) {
-          await supabase.from("rsvps").delete().neq("id", "0");
+          for (const r of rsvps) {
+            await supabase.from("rsvps").delete().eq("id", r.id);
+          }
         } else {
           for (const r of rsvps) {
             await deleteDoc(doc(db, "rsvps", r.id));
           }
         }
         setRsvps([]);
+        try {
+          localStorage.removeItem(`rsvps_cache_${clientId}`);
+        } catch {}
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, "rsvps");
       }
@@ -588,6 +632,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
   // Export full wedding data backup as a downloadable JSON file
   const handleExportData = () => {
+    if (!isAuthenticated) {
+      alert("Please unlock with host passcode first.");
+      return;
+    }
     try {
       const backupData = {
         app: "Royal Hindu Wedding Invitation",
@@ -633,6 +681,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
   // Handle selecting a JSON backup file to import
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAuthenticated) {
+      alert("Please unlock with host passcode first.");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = ""; // Reset input so same file can be chosen again if needed
@@ -691,7 +743,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
   // Confirm and apply the imported backup
   const handleConfirmImport = async () => {
-    if (!importPreviewData) return;
+    if (!isAuthenticated || !importPreviewData) return;
     setIsRestoring(true);
     try {
       const summaryParts: string[] = [];
@@ -715,9 +767,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
       // 2. Restore RSVPs if chosen
       if (importPreviewData.restoreRsvps && importPreviewData.rsvps.length > 0) {
         if (importPreviewData.rsvpImportMode === "replace") {
-          // Clear old RSVPs
+          // Clear old RSVPs belonging specifically to this website partition
           if (isSupabaseEnabled && supabase) {
-            await supabase.from("rsvps").delete().neq("id", "0");
+            for (const old of rsvps) {
+              try { await supabase.from("rsvps").delete().eq("id", old.id); } catch {}
+            }
           } else {
             for (const old of rsvps) {
               try {
@@ -729,7 +783,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
           }
         }
 
-        // Write restored RSVPs
+        // Write restored RSVPs with partition clientId
         if (isSupabaseEnabled && supabase) {
           const formatted = importPreviewData.rsvps.map((r) => ({
             name: r.name || "Guest",
@@ -738,7 +792,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
             guests_count: Number(r.guestsCount ?? (r as any).guests_count ?? 1),
             attend: r.attend !== false,
             message: r.message || "",
-            timestamp: r.timestamp || new Date().toISOString()
+            timestamp: r.timestamp || new Date().toISOString(),
+            clientId,
+            client_id: clientId,
+            remixId: clientId
           }));
           await supabase.from("rsvps").insert(formatted);
         } else {
@@ -748,6 +805,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
             for (const r of importPreviewData.rsvps) {
               const docRef = r.id ? doc(db, "rsvps", r.id) : doc(collection(db, "rsvps"));
               batch.set(docRef, {
+                clientId,
+                remixId: clientId,
                 name: r.name || "Guest",
                 phone: r.phone || "",
                 guestsCount: Number(r.guestsCount ?? (r as any).guests_count ?? 1),
@@ -835,29 +894,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
               {/* Header Action Buttons (Import, Export & Close) */}
               <div className="flex items-center gap-2 flex-wrap">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500/50 text-xs font-bold rounded-xl px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow transition-all"
-                  title="Import data backup from a JSON file"
-                >
-                  <Upload size={14} />
-                  <span>Import Data</span>
-                </button>
-                <button
-                  onClick={handleExportData}
-                  className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white border border-amber-500/50 text-xs font-bold rounded-xl px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow transition-all"
-                  title="Export full data backup to a JSON file"
-                >
-                  <Download size={14} />
-                  <span>Export Data</span>
-                </button>
+                {isAuthenticated && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={handleExportData}
+                      className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white border border-amber-500/50 text-xs font-bold rounded-xl px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow transition-all"
+                      title="Export full data backup to a JSON file"
+                    >
+                      <Download size={14} />
+                      <span>Export Data</span>
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500/50 text-xs font-bold rounded-xl px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow transition-all"
+                      title="Import data backup from a JSON file"
+                    >
+                      <Upload size={14} />
+                      <span>Import Data</span>
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={onClose}
                   className="hidden sm:inline-flex text-pink-800/70 hover:text-pink-900 text-xs font-bold border border-pink-300/30 rounded-full px-3.5 py-1.5 cursor-pointer hover:bg-pink-50 transition-colors"
@@ -894,21 +957,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                 </div>
                 {error && <p className="text-rose-600 text-xs font-bold px-2">{error}</p>}
                 
-                <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                <div className="flex items-center justify-center pt-1">
                   <button
                     type="submit"
                     disabled={isLocked}
-                    className={`bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs uppercase tracking-wider py-2.5 px-6 rounded-xl shadow-md transition-all ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs uppercase tracking-wider py-2.5 px-8 rounded-xl shadow-md transition-all ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                   >
                     Unlock Dashboard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 py-2.5 px-4 rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <Upload size={13} />
-                    <span>Restore From Backup JSON</span>
                   </button>
                 </div>
               </motion.form>
@@ -1266,6 +1321,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
 
                           <div className="col-span-1 md:col-span-2">
                             {renderGaneshaSection()}
+                          </div>
+
+                          <div className="col-span-1 md:col-span-2 bg-white/70 p-4 rounded-xl border border-pink-300/30 shadow-sm space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                                  👑 Wedding Insignia / Brand Logo
+                                </span>
+                                <span className="text-[11px] text-gray-600 block mt-0.5">
+                                  Displayed elegantly in the Hero invocation header and Footer crest badge
+                                </span>
+                              </div>
+                              {editConfig.logoUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditConfig(p => ({ ...p, logoUrl: "" }))}
+                                  className="text-[11px] text-rose-600 hover:text-rose-800 underline font-semibold cursor-pointer shrink-0"
+                                >
+                                  Remove Logo
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-3 items-center">
+                              {editConfig.logoUrl && (
+                                <div className="w-14 h-14 rounded-lg bg-pink-50 border border-pink-200 p-1 flex items-center justify-center shrink-0">
+                                  <img src={editConfig.logoUrl} alt="Logo Preview" className="w-full h-full object-contain" />
+                                </div>
+                              )}
+                              <input
+                                type="text"
+                                value={editConfig.logoUrl || ""}
+                                onChange={e => setEditConfig(p => ({ ...p, logoUrl: e.target.value.trim() }))}
+                                placeholder="Paste logo image URL (e.g. https://...)"
+                                className="flex-1 bg-white text-gray-900 border border-pink-300/40 rounded-lg px-3 py-2 text-xs focus:border-pink-500 outline-none w-full"
+                              />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    try {
+                                      const base64 = await handleImageUpload(e.target.files[0]);
+                                      setEditConfig(prev => ({ ...prev, logoUrl: base64 }));
+                                    } catch (err) {
+                                      alert(err instanceof Error ? err.message : "Failed to process logo image.");
+                                    }
+                                  }
+                                }}
+                                className="text-xs text-pink-800/60 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-gold-500/20 file:text-pink-900 cursor-pointer max-w-[130px] shrink-0"
+                              />
+                            </div>
                           </div>
                           <div>
                             <label className="text-[10px] text-pink-800/70 uppercase tracking-widest block mb-1">Thank You Portrait Image (Direct URL or Upload)</label>
@@ -1807,6 +1913,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
                           <Database size={20} className="text-pink-700" />
                           Remix Database & Data Isolation Status
                         </h4>
+
+                        {/* Partition Isolation Card */}
+                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200/50 pb-3">
+                            <div className="flex items-center gap-2">
+                              <Layers size={18} className="text-purple-700" />
+                              <span className="text-xs font-bold text-purple-950 uppercase tracking-wider">Remix Isolation & Partition Engine</span>
+                            </div>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Active: {activePartitionId}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-purple-900/80 leading-relaxed">
+                            Data for <strong>Remix Hindu Wedding template 1</strong> (master) and upcoming remixes like <strong>hindu template 1 nov client 1</strong> are 100% separated into unique document keys and RSVP partitions so they will <strong>never overlap</strong> or overwrite each other.
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
+                            <div className="p-3 bg-white/70 rounded-xl border border-purple-100 space-y-1">
+                              <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Active Config Document</span>
+                              <div className="font-mono text-purple-900 font-bold break-all">settings/{activePartitionId}</div>
+                            </div>
+                            <div className="p-3 bg-white/70 rounded-xl border border-purple-100 space-y-1">
+                              <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Upcoming Remix Target</span>
+                              <div className="font-mono text-pink-900 font-bold break-all">{UPCOMING_REMIX_PARTITION_ID}</div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-purple-200/40">
+                            <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider block mb-2">Switch Partition Context:</span>
+                            <div className="flex flex-wrap gap-2">
+                              {KNOWN_PARTITIONS.map((partition) => {
+                                const isCurrent = activePartitionId === partition.id;
+                                return (
+                                  <button
+                                    key={partition.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setActivePartitionId(partition.id);
+                                      setAppPartitionId(partition.id);
+                                      setToastMessage(`Switched partition to: ${partition.name}`);
+                                      setShowToast(true);
+                                      setTimeout(() => setShowToast(false), 2500);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                      isCurrent
+                                        ? "bg-purple-900 text-white shadow-sm ring-2 ring-purple-500/30"
+                                        : "bg-white/80 text-purple-900 border border-purple-200 hover:bg-purple-100/70"
+                                    }`}
+                                  >
+                                    {isCurrent && <CheckCircle2 size={12} className="text-emerald-400" />}
+                                    <span>{partition.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
 
                         <div className="bg-emerald-50/80 border border-emerald-300/50 rounded-xl p-4 space-y-2">
                           <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">

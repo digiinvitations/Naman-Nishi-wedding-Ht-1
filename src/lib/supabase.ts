@@ -20,6 +20,8 @@ export interface RSVPRecord {
   attend: boolean;
   message: string;
   timestamp: string;
+  clientId?: string;
+  remixId?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface RSVPRecord {
 export async function saveConfigToDb(newConfig: WeddingConfig, fallbackSave: () => Promise<void>, clientId: string = "config") {
   if (isSupabaseEnabled && supabase) {
     try {
-      // We will save to "settings" table with ID clientId (e.g. config or October T1 Clients -1)
+      // We will save to "settings" table with ID clientId (e.g. remix_hindu_wedding_template_1 or hindu_template_1_nov_client_1)
       const { error } = await supabase
         .from("settings")
         .upsert({ id: clientId, data: newConfig });
@@ -56,18 +58,23 @@ export async function saveConfigToDb(newConfig: WeddingConfig, fallbackSave: () 
 export async function addRsvpToDb(newRsvp: Omit<RSVPRecord, "id">, fallbackAdd: () => Promise<any>) {
   if (isSupabaseEnabled && supabase) {
     try {
+      const payload: any = {
+        name: newRsvp.name,
+        phone: newRsvp.phone,
+        guestsCount: newRsvp.guestsCount,
+        guests_count: newRsvp.guestsCount, // database design might use snake_case
+        attend: newRsvp.attend,
+        message: newRsvp.message,
+        timestamp: newRsvp.timestamp
+      };
+      if (newRsvp.clientId) {
+        payload.clientId = newRsvp.clientId;
+        payload.client_id = newRsvp.clientId;
+      }
       // Map keys to support both camelCase and snake_case database schema designs
       const { error } = await supabase
         .from("rsvps")
-        .insert({
-          name: newRsvp.name,
-          phone: newRsvp.phone,
-          guestsCount: newRsvp.guestsCount,
-          guests_count: newRsvp.guestsCount, // database design might use snake_case
-          attend: newRsvp.attend,
-          message: newRsvp.message,
-          timestamp: newRsvp.timestamp
-        });
+        .insert(payload);
         
       if (error) throw error;
       return;

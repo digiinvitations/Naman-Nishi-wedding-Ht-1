@@ -40,6 +40,7 @@ export interface WeddingConfig {
   youtubeEmbedUrl: string; // YouTube video embed link
   envelopeIconUrl?: string; // Optional custom envelope icon
   thankYouImageUrl?: string; // Optional custom thank you portrait
+  logoUrl?: string; // Royal wedding emblem / company logo
   heroTagline: string;
   gallerySubtitle: string;
   showGallery?: boolean; // Control visibility of photo gallery section
@@ -89,6 +90,7 @@ export const weddingConfig: WeddingConfig = {
   youtubeEmbedUrl: "",
   envelopeIconUrl: "/ganesha.png",
   thankYouImageUrl: "https://cdn.phototourl.com/member/2026-10-26-ef4e3f7c-de06-41d3-aca5-caecb158e6af.jpg",
+  logoUrl: "https://cdn.phototourl.com/member/2026-10-31-0ba1822a-47b9-467c-b8e6-5ca16ea61589.png",
   showGallery: true,
   showRsvp: false,
   gallerySubtitle: "Glimpses of Our Journey",
