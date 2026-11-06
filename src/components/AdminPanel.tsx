@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Users, Check, X, FileSpreadsheet, Trash2, Key, ChevronDown, ChevronUp, Image as ImageIcon, Calendar, Edit3, Settings, Video, Database, Copy, AlertCircle, CheckCircle2, Eye, EyeOff, Upload, Download, FileText, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Layers, HardDrive } from "lucide-react";
-import { WeddingConfig, WeddingEvent, weddingConfig as defaultWeddingConfig } from "../weddingConfig";
+import { WeddingConfig, WeddingEvent, weddingConfig as defaultWeddingConfig, sortEventsByDate } from "../weddingConfig";
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, setDoc, addDoc, writeBatch } from "firebase/firestore";
 import { uploadToFsdb } from "../lib/fsdb";
@@ -273,7 +273,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config,
   };
 
   const saveChanges = () => {
-    onConfigChange(editConfig);
+    const sortedConfig = {
+      ...editConfig,
+      events: sortEventsByDate(editConfig.events)
+    };
+    setEditConfig(sortedConfig);
+    onConfigChange(sortedConfig);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };

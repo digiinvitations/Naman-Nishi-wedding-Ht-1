@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { FirestoreImage } from "./components/FirestoreImage";
 import { fetchFromFsdb } from "./lib/fsdb";
@@ -28,7 +28,7 @@ import {
   Pencil
 } from "lucide-react";
 
-import { weddingConfig as defaultWeddingConfig, WeddingEvent, WeddingConfig } from "./weddingConfig";
+import { weddingConfig as defaultWeddingConfig, WeddingEvent, WeddingConfig, sortEventsByDate } from "./weddingConfig";
 import { OrnateFrame } from "./components/OrnateFrame";
 import { EnvelopeCover } from "./components/EnvelopeCover";
 import { RSVPModal } from "./components/RSVPModal";
@@ -44,6 +44,25 @@ import { db, handleFirestoreError, OperationType } from "./lib/firebase";
 import { collection, doc, setDoc, onSnapshot, addDoc, getDoc } from "firebase/firestore";
 import { isSupabaseEnabled, supabase, saveConfigToDb, addRsvpToDb } from "./lib/supabase";
 import { getAppPartitionId, MASTER_PARTITION_ID } from "./lib/appIdentity";
+
+const ensureEventsSortedAndComplete = (loadedEvents?: WeddingEvent[]): WeddingEvent[] => {
+  let list = Array.isArray(loadedEvents) && loadedEvents.length > 0 ? [...loadedEvents] : [...defaultWeddingConfig.events];
+  const hasDinner = list.some(
+    (e) =>
+      e.id === "dinner-ceremony" ||
+      e.id === "dinner-party" ||
+      (e.name && e.name.toLowerCase().includes("dinner"))
+  );
+  if (!hasDinner) {
+    const defaultDinner = defaultWeddingConfig.events.find(
+      (e) => e.id === "dinner-ceremony" || e.name === "DINNER"
+    );
+    if (defaultDinner) {
+      list.push(defaultDinner);
+    }
+  }
+  return sortEventsByDate(list);
+};
 
 const TurbanIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
@@ -96,7 +115,7 @@ export default function App() {
               ...defaultWeddingConfig,
               ...configData,
               showGallery: configData.showGallery !== undefined ? configData.showGallery : defaultWeddingConfig.showGallery,
-              events: configData.events || defaultWeddingConfig.events,
+              events: ensureEventsSortedAndComplete(configData.events),
               galleryImages: configData.galleryImages || defaultWeddingConfig.galleryImages,
               groom: { ...defaultWeddingConfig.groom, ...(configData.groom || {}) },
               bride: { ...defaultWeddingConfig.bride, ...(configData.bride || {}) },
@@ -122,7 +141,7 @@ export default function App() {
                 ...configData,
                 showGallery: configData.showGallery !== undefined ? configData.showGallery : defaultWeddingConfig.showGallery,
                 showRsvp: configData.showRsvp === true ? true : false,
-                events: configData.events || defaultWeddingConfig.events,
+                events: ensureEventsSortedAndComplete(configData.events),
                 galleryImages: configData.galleryImages || defaultWeddingConfig.galleryImages,
                 groom: { ...defaultWeddingConfig.groom, ...(configData.groom || {}) },
                 bride: { ...defaultWeddingConfig.bride, ...(configData.bride || {}) },
@@ -143,7 +162,8 @@ export default function App() {
           const cachedData = JSON.parse(cached);
           setConfig(prev => ({
             ...prev,
-            ...cachedData
+            ...cachedData,
+            events: ensureEventsSortedAndComplete(cachedData.events)
           }));
         }
       } catch {}
@@ -156,7 +176,7 @@ export default function App() {
             ...data,
             showGallery: data.showGallery !== undefined ? data.showGallery : defaultWeddingConfig.showGallery,
             showRsvp: data.showRsvp === true ? true : false,
-            events: data.events || defaultWeddingConfig.events,
+            events: ensureEventsSortedAndComplete(data.events),
             galleryImages: data.galleryImages || defaultWeddingConfig.galleryImages,
             groom: { ...defaultWeddingConfig.groom, ...(data.groom || {}) },
             bride: { ...defaultWeddingConfig.bride, ...(data.bride || {}) },
@@ -175,7 +195,7 @@ export default function App() {
                 ...data,
                 showGallery: data.showGallery !== undefined ? data.showGallery : defaultWeddingConfig.showGallery,
                 showRsvp: data.showRsvp === true ? true : false,
-                events: data.events || defaultWeddingConfig.events,
+                events: ensureEventsSortedAndComplete(data.events),
                 galleryImages: data.galleryImages || defaultWeddingConfig.galleryImages,
                 groom: { ...defaultWeddingConfig.groom, ...(data.groom || {}) },
                 bride: { ...defaultWeddingConfig.bride, ...(data.bride || {}) },
@@ -297,6 +317,16 @@ export default function App() {
 
   // Responsive scratch heart size that fits the screen width from left to right
   const [heartSize, setHeartSize] = useState(105);
+  // Ensure initial load stays at top (Hero section) and does not jump
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+  }, []);
+
   useEffect(() => {
     const updateHeartSize = () => {
       const w = window.innerWidth;
@@ -314,21 +344,56 @@ export default function App() {
   // Lightbox / Gallery states
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
 
-  // Slider states
+  // Chronologically sorted events array ensuring DINNER and all ceremonies are ordered by date
+  const sortedEvents = useMemo(() => {
+    return ensureEventsSortedAndComplete(config.events);
+  }, [config.events]);
+
+  // Events Slider & Smooth Interaction states
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
-  const [eventKeyCount, setEventKeyCount] = useState(0);
+  const [eventDirection, setEventDirection] = useState(1);
+  const [isEventsManual, setIsEventsManual] = useState(false);
+  const [isDraggingEvent, setIsDraggingEvent] = useState(false);
+
+  // Keep index within bounds if events count changes
+  useEffect(() => {
+    if (currentEventIndex >= sortedEvents.length && sortedEvents.length > 0) {
+      setCurrentEventIndex(sortedEvents.length - 1);
+    }
+  }, [sortedEvents.length, currentEventIndex]);
+
+  const paginateEvent = (newDirection: number, manual: boolean = false) => {
+    if (manual) setIsEventsManual(true);
+    setEventDirection(newDirection);
+    setCurrentEventIndex((prev) => {
+      const len = sortedEvents.length;
+      if (len <= 1) return 0;
+      return (prev + newDirection + len) % len;
+    });
+  };
+
+  const selectEvent = (index: number) => {
+    setIsEventsManual(true);
+    setEventDirection(index >= currentEventIndex ? 1 : -1);
+    setCurrentEventIndex(index);
+  };
+
+  const nextEvent = () => paginateEvent(1, true);
+  const prevEvent = () => paginateEvent(-1, true);
+
+  // 5-second automatic transition when untouched; converts strictly to manual when user interacts
+  useEffect(() => {
+    if (!isOpened || isEventsManual || isDraggingEvent || sortedEvents.length <= 1) return;
+    const interval = setInterval(() => {
+      paginateEvent(1, false);
+    }, 5000); // exactly 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isOpened, isEventsManual, isDraggingEvent, sortedEvents.length, currentEventIndex]);
+
+  // Gallery slider states
   const [currentGalleryIndex, setCurrentGalleryIndex] = useState(0);
   const [galleryKeyCount, setGalleryKeyCount] = useState(0);
-
-  const nextEvent = () => {
-    setCurrentEventIndex((prev) => (prev + 1) % config.events.length);
-    setEventKeyCount(c => c + 1);
-  };
-
-  const prevEvent = () => {
-    setCurrentEventIndex((prev) => (prev - 1 + config.events.length) % config.events.length);
-    setEventKeyCount(c => c + 1);
-  };
 
   const nextGallery = () => {
     setCurrentGalleryIndex((prev) => (prev + 1) % config.galleryImages.length);
@@ -339,16 +404,6 @@ export default function App() {
     setCurrentGalleryIndex((prev) => (prev - 1 + config.galleryImages.length) % config.galleryImages.length);
     setGalleryKeyCount(c => c + 1);
   };
-
-  // Auto-advance Event Slider
-  useEffect(() => {
-    if (!isOpened || config.events.length <= 1) return;
-    const interval = setInterval(() => {
-      nextEvent();
-    }, 6000);
-
-  return () => clearInterval(interval);
-  }, [isOpened, config.events.length]);
 
   // Auto-advance Gallery Slider
   useEffect(() => {
@@ -548,6 +603,9 @@ export default function App() {
   const handleOpenEnvelope = () => {
     setIsOpened(true);
     setMusicPlaying(true);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     startMusicPlayback();
     if (audioRef.current && audioRef.current.paused) {
       audioRef.current.play()
@@ -700,7 +758,7 @@ export default function App() {
             config.bride?.imageUrl,
             "/ganesha.png",
             ...(config.galleryImages?.map(i => i.url) || []),
-            ...(config.events?.map(e => e.imageUrl) || [])
+            ...(sortedEvents?.map(e => e.imageUrl) || [])
           ].filter(Boolean) as string[]}
           requiredImage="/ganesha.png"
           onComplete={() => setIsPreloaded(true)}
@@ -1273,116 +1331,173 @@ export default function App() {
           </div>
 
           <div className="relative">
-            {config.events.length > 0 && (
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`event-${eventKeyCount}`}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.5 }}
-                  className="flex flex-col lg:flex-row border border-gold-500/20 bg-gradient-to-br from-white via-royal-red-50 to-white rounded-3xl overflow-hidden shadow-xl"
-                >
-                  {/* Event Portrait Banner */}
-                  <div className="lg:w-2/5 h-auto relative overflow-hidden group bg-black/5 flex items-center justify-center">
-                    <FirestoreImage
-                      src={config.events[currentEventIndex].imageUrl}
-                      alt={config.events[currentEventIndex].name}
-                      className="w-full h-auto object-contain transition-transform duration-700 group-hover:scale-105"
-                    />
-                    {/* Color tint overlay based on event accent */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
-                    
-                    {/* Hindi Event Name Tag */}
-                    {config.events[currentEventIndex].hindiName && (
-                      <div className="absolute bottom-4 left-4 z-10">
-                        <span className="font-display text-gold-200 text-lg tracking-wider drop-shadow-md">
-                          {config.events[currentEventIndex].hindiName}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Event Details Content */}
-                  <div className="lg:w-3/5 p-6 md:p-8 flex flex-col justify-between space-y-6">
-                    <div>
-                      <h3 className="font-display text-2xl md:text-3xl text-red-700 font-bold">
-                        {config.events[currentEventIndex].name}
-                      </h3>
+            {/* Main Draggable Event Card with Spring Physics & Directional Transitions */}
+            {sortedEvents.length > 0 && (
+              <div className="relative overflow-hidden min-h-[440px]">
+                <AnimatePresence initial={false} custom={eventDirection} mode="wait">
+                  <motion.div
+                    key={`event-${sortedEvents[currentEventIndex]?.id || currentEventIndex}`}
+                    custom={eventDirection}
+                    variants={{
+                      enter: (direction: number) => ({
+                        x: direction > 0 ? 140 : -140,
+                        opacity: 0,
+                        scale: 0.98
+                      }),
+                      center: {
+                        x: 0,
+                        opacity: 1,
+                        scale: 1,
+                        transition: {
+                          x: { type: "spring", stiffness: 300, damping: 28 },
+                          opacity: { duration: 0.35 }
+                        }
+                      },
+                      exit: (direction: number) => ({
+                        x: direction < 0 ? 140 : -140,
+                        opacity: 0,
+                        scale: 0.98,
+                        transition: { duration: 0.25 }
+                      })
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.35}
+                    onDragStart={() => {
+                      setIsDraggingEvent(true);
+                      setIsEventsManual(true);
+                    }}
+                    onDragEnd={(_e, info) => {
+                      setIsDraggingEvent(false);
+                      setIsEventsManual(true);
+                      const threshold = 40;
+                      if (info.offset.x < -threshold || info.velocity.x < -250) {
+                        paginateEvent(1, true); // Swiped Left -> Advance to next
+                      } else if (info.offset.x > threshold || info.velocity.x > 250) {
+                        paginateEvent(-1, true); // Swiped Right -> Back to previous
+                      }
+                    }}
+                    className="flex flex-col lg:flex-row border border-gold-500/20 bg-gradient-to-br from-white via-royal-red-50 to-white rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing touch-pan-y select-none"
+                  >
+                    {/* Event Portrait Banner */}
+                    <div className="lg:w-2/5 h-auto relative overflow-hidden group bg-black/5 flex items-center justify-center min-h-[260px]">
+                      <FirestoreImage
+                        src={sortedEvents[currentEventIndex].imageUrl}
+                        alt={sortedEvents[currentEventIndex].name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 pointer-events-none"
+                      />
+                      {/* Color tint overlay based on event accent */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-85" />
                       
-                      <div className="w-12 h-0.5 bg-gold-600/40 my-4" />
+                      {/* Hindi Event Name Tag */}
+                      {sortedEvents[currentEventIndex].hindiName && (
+                        <div className="absolute bottom-4 left-4 z-10">
+                          <span className="font-display text-gold-200 text-lg md:text-xl tracking-wider drop-shadow-md">
+                            {sortedEvents[currentEventIndex].hindiName}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Schedule fields */}
-                      <div className="space-y-3.5">
-                        <div className="flex items-center space-x-3 text-gray-900 text-sm">
-                          <Calendar size={18} className="text-gold-700 shrink-0" />
-                          <span className="font-sans font-semibold">{config.events[currentEventIndex].date}</span>
+                    {/* Event Details Content */}
+                    <div className="lg:w-3/5 p-6 md:p-8 flex flex-col justify-between space-y-6">
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] sm:text-xs uppercase font-extrabold tracking-[0.2em] text-gold-800 bg-gold-100/80 border border-gold-400/30 px-3 py-1 rounded-full">
+                            Ceremony {currentEventIndex + 1} of {sortedEvents.length}
+                          </span>
                         </div>
+
+                        <h3 className="font-display text-2xl md:text-3xl text-red-700 font-bold mt-2.5">
+                          {sortedEvents[currentEventIndex].name}
+                        </h3>
                         
-                        <div className="flex items-center space-x-3 text-gray-900 text-sm">
-                          <Clock size={18} className="text-gold-700 shrink-0" />
-                          <span className="font-sans font-medium">{config.events[currentEventIndex].time}</span>
-                        </div>
-                        
-                        <div className="flex items-start space-x-3 text-gray-800 text-sm">
-                          <MapPin size={18} className="text-gold-700 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-semibold text-gold-900">{config.events[currentEventIndex].venueName}</p>
-                            <p className="text-xs text-gray-700 mt-1 leading-relaxed font-medium">{config.events[currentEventIndex].venueAddress}</p>
+                        <div className="w-12 h-0.5 bg-gold-600/40 my-4" />
+
+                        {/* Schedule fields */}
+                        <div className="space-y-3.5">
+                          <div className="flex items-center space-x-3 text-gray-900 text-sm">
+                            <Calendar size={18} className="text-gold-700 shrink-0" />
+                            <span className="font-sans font-semibold">{sortedEvents[currentEventIndex].date}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-3 text-gray-900 text-sm">
+                            <Clock size={18} className="text-gold-700 shrink-0" />
+                            <span className="font-sans font-medium">{sortedEvents[currentEventIndex].time}</span>
+                          </div>
+                          
+                          <div className="flex items-start space-x-3 text-gray-800 text-sm">
+                            <MapPin size={18} className="text-gold-700 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-semibold text-gold-900">{sortedEvents[currentEventIndex].venueName}</p>
+                              <p className="text-xs text-gray-700 mt-1 leading-relaxed font-medium">{sortedEvents[currentEventIndex].venueAddress}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
+
+                      {/* Interactive Map Preview */}
+                      {sortedEvents[currentEventIndex].mapEmbedUrl && (
+                        <div className="w-full mt-4 z-10 relative">
+                          <EventMap 
+                            mapEmbedUrl={sortedEvents[currentEventIndex].mapEmbedUrl} 
+                            venueName={sortedEvents[currentEventIndex].venueName} 
+                            onDirectionsClick={pauseMusic}
+                          />
+                        </div>
+                      )}
+
+                      {/* Directions Trigger */}
+                      <a
+                        href={sortedEvents[currentEventIndex].mapDirectionsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          pauseMusic();
+                        }}
+                        className="w-full bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-royal-red-950 font-bold uppercase text-xs tracking-wider py-3 px-6 rounded-xl text-center shadow-lg hover:shadow-[0_0_15px_rgba(222,196,127,0.4)] transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
+                      >
+                        <MapPin size={15} />
+                        <span>Get Directions</span>
+                        <ExternalLink size={13} />
+                      </a>
                     </div>
-
-                    {/* Interactive Map Preview */}
-                    {config.events[currentEventIndex].mapEmbedUrl && (
-                      <div className="w-full mt-4 z-10 relative">
-                        <EventMap 
-                          mapEmbedUrl={config.events[currentEventIndex].mapEmbedUrl} 
-                          venueName={config.events[currentEventIndex].venueName} 
-                          onDirectionsClick={pauseMusic}
-                        />
-                      </div>
-                    )}
-
-                    {/* Directions Trigger */}
-                    <a
-                      href={config.events[currentEventIndex].mapDirectionsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={pauseMusic}
-                      className="w-full bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-royal-red-950 font-bold uppercase text-xs tracking-wider py-3 px-6 rounded-xl text-center shadow-lg hover:shadow-[0_0_15px_rgba(222,196,127,0.4)] transition-all duration-300 flex items-center justify-center space-x-2"
-                    >
-                      <MapPin size={15} />
-                      <span>Get Directions</span>
-                      <ExternalLink size={13} />
-                    </a>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             )}
 
             {/* Slider Controls */}
-            {config.events.length > 1 && (
-              <div className="flex justify-center items-center mt-8 space-x-4">
+            {sortedEvents.length > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-7">
                 <button
-                  onClick={prevEvent}
-                  className="w-10 h-10 rounded-full border border-gold-500/30 flex items-center justify-center text-gold-800 hover:text-gold-900 hover:border-gold-600 transition-colors shadow-md hover:shadow-lg cursor-pointer bg-white"
+                  onClick={() => paginateEvent(-1, true)}
+                  className="w-11 h-11 rounded-full border border-gold-500/30 flex items-center justify-center text-gold-800 hover:text-gold-900 hover:border-gold-600 transition-all shadow-md hover:shadow-lg cursor-pointer bg-white active:scale-95"
+                  title="Previous Ceremony"
                 >
                   <span className="sr-only">Previous</span>
                   &#8592;
                 </button>
                 <div className="flex space-x-2">
-                  {config.events.map((_, idx) => (
-                    <div
+                  {sortedEvents.map((_, idx) => (
+                    <button
                       key={`event-indicator-${idx}`}
-                      className={`w-2 h-2 rounded-full transition-all duration-300 ${idx === currentEventIndex ? 'bg-gold-600 w-6' : 'bg-gold-600/30'}`}
+                      onClick={() => selectEvent(idx)}
+                      className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                        idx === currentEventIndex ? 'bg-gold-600 w-8' : 'bg-gold-600/30 w-2.5 hover:bg-gold-600/60'
+                      }`}
+                      title={`Go to Ceremony ${idx + 1}`}
                     />
                   ))}
                 </div>
                 <button
-                  onClick={nextEvent}
-                  className="w-10 h-10 rounded-full border border-gold-500/30 flex items-center justify-center text-gold-800 hover:text-gold-900 hover:border-gold-600 transition-colors shadow-md hover:shadow-lg cursor-pointer bg-white"
+                  onClick={() => paginateEvent(1, true)}
+                  className="w-11 h-11 rounded-full border border-gold-500/30 flex items-center justify-center text-gold-800 hover:text-gold-900 hover:border-gold-600 transition-all shadow-md hover:shadow-lg cursor-pointer bg-white active:scale-95"
+                  title="Next Ceremony"
                 >
                   <span className="sr-only">Next</span>
                   &#8594;
@@ -1884,8 +1999,8 @@ export default function App() {
         guestsCount={rsvpGuests}
         weddingDate={config.weddingDate}
         displayDate={config.displayDate}
-        venueName={config.events.find(e => e.id.includes("wedding"))?.venueName || "Hotel Shanvi Landmark"}
-        venueAddress={config.events.find(e => e.id.includes("wedding"))?.venueAddress || "Hotel Shanvi Landmark Panna"}
+        venueName={sortedEvents.find(e => e.id.includes("wedding"))?.venueName || "Hotel Shanvi Landmark"}
+        venueAddress={sortedEvents.find(e => e.id.includes("wedding"))?.venueAddress || "Hotel Shanvi Landmark Panna"}
       />
 
       {/* Admin Dashboard Drawer/Modal */}

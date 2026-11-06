@@ -17,6 +17,82 @@ export interface WeddingEvent {
   accentColor: string;
 }
 
+/**
+ * Parses any wedding event date string (e.g. "23 November 2026", "Monday, 23rd November 2026", "2026-11-23")
+ * and extracts timestamp for strict chronological sorting.
+ */
+export function getEventDateTimestamp(event: { date?: string; time?: string }): number {
+  if (!event || !event.date) return 0;
+  const str = event.date.toLowerCase();
+
+  // Year: match 4 digits like 2026
+  const yearMatch = str.match(/\b(20\d\d)\b/);
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : 2026;
+
+  // Month matching
+  const months: { [key: string]: number } = {
+    jan: 0, january: 0,
+    feb: 1, february: 1,
+    mar: 2, march: 2,
+    apr: 3, april: 3,
+    may: 4,
+    jun: 5, june: 5,
+    jul: 6, july: 6,
+    aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8,
+    oct: 9, october: 9,
+    nov: 10, november: 10,
+    dec: 11, december: 11
+  };
+
+  let month = 10; // default to Nov
+  for (const [mName, mIdx] of Object.entries(months)) {
+    const regex = new RegExp(`\\b${mName}\\b`, "i");
+    if (regex.test(str)) {
+      month = mIdx;
+      break;
+    }
+  }
+
+  // Day: match 1st, 2nd, 3rd, 24th, 23rd or just standalone 1-31
+  let day = 1;
+  const dayMatch = str.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/);
+  if (dayMatch) {
+    const val = parseInt(dayMatch[1], 10);
+    if (val >= 1 && val <= 31) {
+      day = val;
+    }
+  }
+
+  // Time parsing (e.g. "Evening 7:00 PM onwards", "8:00 PM", "7:00 AM", "12:00 PM", "2:00 PM")
+  let hours = 12;
+  let minutes = 0;
+  if (event.time) {
+    const tStr = event.time.toLowerCase();
+    const timeMatch = tStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (timeMatch) {
+      let h = parseInt(timeMatch[1], 10);
+      const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+      const isPm = tStr.includes("pm") || tStr.includes("evening") || tStr.includes("night");
+      const isAm = tStr.includes("am") || tStr.includes("morning");
+      if (isPm && h < 12) h += 12;
+      if (isAm && h === 12) h = 0;
+      hours = h;
+      minutes = m;
+    }
+  }
+
+  return new Date(year, month, day, hours, minutes).getTime();
+}
+
+/**
+ * Sorts any list of wedding events chronologically by date and time
+ */
+export function sortEventsByDate(events: WeddingEvent[]): WeddingEvent[] {
+  if (!Array.isArray(events)) return [];
+  return [...events].sort((a, b) => getEventDateTimestamp(a) - getEventDateTimestamp(b));
+}
+
 export interface WeddingConfig {
   heroImageUrl: string;
   bride: {
@@ -118,6 +194,32 @@ export const weddingConfig: WeddingConfig = {
   ],
   events: [
     {
+      id: "haldi-mehndi-ceremony",
+      name: "Nishi ki Haldi & Mehndi Ceremony",
+      hindiName: "॥ हल्दी एवं मेहँदी रस्म ॥",
+      date: "Friday, 23rd October 2026",
+      time: "12:00 PM onwards",
+      venueName: "Hotel Mohan Raj Vilas Panna",
+      venueAddress: "Hotel Mohan Raj Vilas, Panna, Madhya Pradesh",
+      mapEmbedUrl: "",
+      mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Mohan+Raj+Vilas+Panna",
+      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-ab69b998-6000-4096-91f1-9a6782c24f26.png",
+      accentColor: "from-amber-600 to-yellow-900"
+    },
+    {
+      id: "dinner-ceremony",
+      name: "DINNER",
+      hindiName: "॥ स्नेह भोज (Dinner) ॥",
+      date: "Monday, 23rd November 2026",
+      time: "Evening 7:00 PM onwards",
+      venueName: "Mohan Raj vilas",
+      venueAddress: "Hotel Mohan Raj vilas, Panna",
+      mapEmbedUrl: "",
+      mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Mohan+Raj+Vilas+Panna",
+      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-8568f815-889a-4dba-9b80-4691c9cfbfa0.png",
+      accentColor: "from-amber-700 to-rose-950"
+    },
+    {
       id: "sangeet-ring-ceremony",
       name: "Sangeet & Ring ceremony",
       hindiName: "॥ संगीत एवं मुद्रिका रस्म ॥",
@@ -155,19 +257,6 @@ export const weddingConfig: WeddingConfig = {
       mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Shanvi+Landmark+Panna",
       imageUrl: "https://cdn.phototourl.com/member/2026-10-26-39ad2849-6ae9-4257-807a-7fed513ba64a.png",
       accentColor: "from-royal-red-800 to-royal-red-950"
-    },
-    {
-      id: "haldi-mehndi-ceremony",
-      name: "Nishi ki Haldi & Mehndi Ceremony",
-      hindiName: "॥ हल्दी एवं मेहँदी रस्म ॥",
-      date: "Friday, 23rd October 2026",
-      time: "12:00 PM onwards",
-      venueName: "Hotel Mohan Raj Vilas Panna",
-      venueAddress: "Hotel Mohan Raj Vilas, Panna, Madhya Pradesh",
-      mapEmbedUrl: "",
-      mapDirectionsUrl: "https://maps.google.com/?q=Hotel+Mohan+Raj+Vilas+Panna",
-      imageUrl: "https://cdn.phototourl.com/member/2026-10-26-ab69b998-6000-4096-91f1-9a6782c24f26.png",
-      accentColor: "from-amber-600 to-yellow-900"
     }
   ],
   socialLinks: {
